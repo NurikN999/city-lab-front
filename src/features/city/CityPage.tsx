@@ -20,6 +20,7 @@ import { useRouteDrawing } from './hooks/useRouteDrawing'
 import { LAYERS, type LayerSphere } from './layers'
 import styles from './CityPage.module.css'
 import { valuesById } from './rank'
+import { useTweenedValues } from './tween'
 import { chooseRoute, emptyDraft, toggleAction, withRoute, type Draft } from './scenario'
 import { afterAiPlan, afterSimulation, type View } from './view'
 
@@ -89,6 +90,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const isResult = view.mode === 'result'
   const shownValues: Record<string, MetricValues> = isResult ? view.data.result.after.districts : baseValues
   const ghostValues = isResult ? view.data.result.before.districts : null
+  const mapValues = useTweenedValues(ghostValues, shownValues)
   const resultRouteId = isResult ? (view.data.scenario.items.find((i) => i.route_id !== null)?.route_id ?? null) : null
   const resultRoute = routes.find((r) => r.id === resultRouteId)
   const coverageStops: LatLng[] = resultRoute ? resultRoute.stops.map(({ lat, lng }) => ({ lat, lng })) : []
@@ -103,7 +105,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       <CityMap
         districts={city.districts}
         metric={metric}
-        values={shownValues}
+        values={mapValues}
         ghostValues={ghostValues}
         selectedId={selectedId}
         routes={routesOnMap}
