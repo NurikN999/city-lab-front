@@ -29,7 +29,9 @@ export function useRouteDrawing() {
         setPath(data.path.coordinates)
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setPreview({ status: 'error', error: error instanceof Error ? error.message : String(error) })
+        if (controller.signal.aborted) return
+        setPreview({ status: 'error', error: error instanceof Error ? error.message : String(error) })
+        setPath(null) // старая линия уже не соответствует точкам
       })
   }
 

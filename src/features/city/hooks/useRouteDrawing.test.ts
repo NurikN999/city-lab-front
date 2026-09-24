@@ -10,7 +10,11 @@ function stubPendingFetch() {
   const pending: ((response: Response) => void)[] = []
   const fetch = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)))
   vi.stubGlobal('fetch', fetch)
-  return { fetch, answer: (i: number) => pending[i](new Response(JSON.stringify(previewBody))) }
+  return {
+    fetch,
+    answer: (i: number) => pending[i](new Response(JSON.stringify(previewBody))),
+    fail: (i: number) => pending[i](new Response(JSON.stringify({ message: 'Too Many Attempts.' }), { status: 429 })),
+  }
 }
 
 describe('useRouteDrawing', () => {
@@ -63,6 +67,20 @@ describe('useRouteDrawing', () => {
     expect(result.current.preview.status).toBe('loading')
     expect(result.current.path).toEqual(previewBody.path.coordinates)
     act(() => result.current.reset())
+    expect(result.current.path).toBeNull()
+  })
+
+  it('drops the old road line when the next preview fails', async () => {
+    const { answer, fail } = stubPendingFetch()
+    const { result } = renderHook(() => useRouteDrawing())
+
+    act(() => result.current.add(p(0)))
+    act(() => result.current.add(p(1)))
+    await act(async () => answer(0))
+    act(() => result.current.add(p(2)))
+    await act(async () => fail(1))
+
+    expect(result.current.preview.status).toBe('error')
     expect(result.current.path).toBeNull()
   })
 })

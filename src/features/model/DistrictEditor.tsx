@@ -62,7 +62,7 @@ function DistrictForm({ district, metrics, token, onSaved, onUnauthorized }: Dis
   const [error, save, isPending] = useActionState(async () => {
     const body = {
       population: Number(fields.population),
-      values: Object.fromEntries(metrics.filter((m) => fields[m.key] !== '').map((m) => [m.key, Number(fields[m.key])])),
+      values: Object.fromEntries(metrics.map((m) => [m.key, Number(fields[m.key])])),
     }
     try {
       onSaved(await updateDistrict(district.id, body, token))
@@ -80,12 +80,12 @@ function DistrictForm({ district, metrics, token, onSaved, onUnauthorized }: Dis
     <form action={save} className={styles.editForm}>
       <label className={styles.field}>
         Население
-        <input {...field('population')} type="number" min={0} step={100} required />
+        <input {...field('population')} type="number" min={0} max={2_000_000} step={1} required />
       </label>
       {metrics.map((m) => (
         <label key={m.key} className={styles.field}>
           {m.name}, {m.unit}
-          <input {...field(m.key)} type="number" min={m.min} max={m.max} step={0.1} />
+          <input {...field(m.key)} type="number" min={m.min} max={m.max} step={0.1} required />
         </label>
       ))}
       {error && <p role="alert" className={styles.error}>{error}</p>}

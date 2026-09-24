@@ -17,7 +17,7 @@ const districts = [district(11, '12 мкр'), district(12, '12А мкр')]
 
 describe('DistrictEditor', () => {
   it('saves population and editable metric values of the chosen district', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 12, population: 9000, values: { traffic: 70 } }), { status: 200 }))
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => new Response(JSON.stringify({ id: 12, population: 9000, values: { traffic: 70 } }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     const onSaved = vi.fn()
     render(<DistrictEditor districts={districts} metrics={metrics} token="t" onSaved={onSaved} onUnauthorized={vi.fn()} />)
@@ -30,9 +30,9 @@ describe('DistrictEditor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Сохранить район' }))
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled())
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0]
     expect(url).toMatch(/\/districts\/12$/)
-    expect(JSON.parse(String(init.body))).toEqual({ population: 9000, values: { traffic: 70 } })
+    expect(JSON.parse(String(init?.body))).toEqual({ population: 9000, values: { traffic: 70 } })
     expect(screen.queryByLabelText('Покрытие ОТ, %')).not.toBeInTheDocument()
   })
 
@@ -61,5 +61,16 @@ describe('DistrictEditor', () => {
 
     expect(screen.getByLabelText('Загрузка дорог, %')).toHaveValue(70)
     expect(screen.getByLabelText('Население')).toHaveValue(9000)
+  })
+
+  it('does not send an emptied metric field', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<DistrictEditor districts={districts} metrics={metrics} token="t" onSaved={vi.fn()} onUnauthorized={vi.fn()} />)
+
+    await userEvent.clear(screen.getByLabelText('Загрузка дорог, %'))
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить район' }))
+
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

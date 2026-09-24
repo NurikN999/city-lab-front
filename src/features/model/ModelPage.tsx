@@ -14,7 +14,7 @@ function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void 
   const model = useFetch('/model', modelResponseSchema)
   const city = useFetch('/city', cityResponseSchema)
   const metricName = (key: string) => (city.status === 'success' ? city.data.metrics.find((m) => m.key === key)?.name : undefined) ?? key
-  const markSaved = () => { setVersion((v) => v + 1); setSavedAt(new Date().toLocaleTimeString('ru-RU')) }
+  const markSaved = () => setSavedAt(new Date().toLocaleTimeString('ru-RU'))
 
   return (
     <div className={styles.page}>
@@ -43,7 +43,7 @@ function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void 
                     key={action.id}
                     action={action}
                     token={token}
-                    onSaved={markSaved}
+                    onSaved={() => { setVersion((v) => v + 1); markSaved() }}
                     onUnauthorized={onLogout}
                   />
                 ))}
