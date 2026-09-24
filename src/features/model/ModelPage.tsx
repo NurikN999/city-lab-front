@@ -1,3 +1,81 @@
+import { useState } from 'react'
+import { useFetch } from '../../shared/hooks/useFetch'
+import { actionsSchema, modelResponseSchema } from '../../shared/lib/schemas'
+import { ActionRow } from './ActionRow'
+import { LoginForm } from './LoginForm'
+import styles from './ModelPage.module.css'
+import { clearToken, readToken } from './session'
+
+function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void }) {
+  const [version, setVersion] = useState(0)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+  const actions = useFetch('/actions', actionsSchema, version)
+  const model = useFetch('/model', modelResponseSchema)
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.head}>
+        <div>
+          <h1 className={styles.title}>Модель симуляции</h1>
+          <p className={styles.hint}>Стоимости и коэффициенты открыты. После сохранения все сценарии пересчитываются.</p>
+        </div>
+        <button type="button" className={styles.secondary} onClick={onLogout}>Выйти</button>
+      </header>
+      {savedAt && <p role="status" className={styles.saved}>Сохранено в {savedAt}. Откройте сравнение — цифры уже пересчитаны.</p>}
+
+      <div className={styles.grid}>
+        <section className={styles.card} aria-labelledby="actions-title">
+          <h2 id="actions-title" className={styles.cardTitle}>Действия</h2>
+          {actions.status === 'loading' && <p className={styles.hint}>Загрузка…</p>}
+          {actions.status === 'error' && <p role="alert" className={styles.error}>{actions.error}</p>}
+          {actions.status === 'success' && (
+            <table className={styles.table}>
+              <thead>
+                <tr><th scope="col">Действие</th><th scope="col">Сфера</th><th scope="col">Стоимость</th><th scope="col">Эффекты</th><th scope="col"><span className={styles.visuallyHidden}>Правка</span></th></tr>
+              </thead>
+              <tbody>
+                {actions.data.map((action) => (
+                  <ActionRow
+                    key={action.id}
+                    action={action}
+                    token={token}
+                    onSaved={() => { setVersion((v) => v + 1); setSavedAt(new Date().toLocaleTimeString('ru-RU')) }}
+                    onUnauthorized={onLogout}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        <aside className={styles.side}>
+          <section className={styles.card} aria-labelledby="rules-title">
+            <h2 id="rules-title" className={styles.cardTitle}>Правила движка</h2>
+            {model.status === 'success' && (
+              <dl className={styles.rules}>
+                {model.data.couplings.map((c) => (
+                  <div key={`${c.source}-${c.target}`}><dt>{c.source} → {c.target}</dt><dd>{c.factor}</dd></div>
+                ))}
+                <div><dt>Повтор действия в районе</dt><dd>× {model.data.constants.diminishing_factor}</dd></div>
+                <div><dt>Радиус «соседей»</dt><dd>{model.data.constants.neighbor_radius_m} м</dd></div>
+                <div><dt>Доступ к остановке</dt><dd>{model.data.constants.stop_access_radius_m} м</dd></div>
+              </dl>
+            )}
+            {model.status === 'error' && <p role="alert" className={styles.error}>{model.error}</p>}
+          </section>
+          <section className={`${styles.card} ${styles.demo}`}>
+            <h2 className={styles.cardTitle}>Стоимости — демо</h2>
+            <p className={styles.hint}>Перед пилотом заменяются данными открытого бюджета и управлений акимата.</p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  )
+}
+
 export default function ModelPage() {
-  return <h1>Модель симуляции</h1>
+  const [token, setToken] = useState<string | null>(readToken)
+
+  if (!token) return <LoginForm onLogin={setToken} />
+  return <ModelEditor token={token} onLogout={() => { clearToken(); setToken(null) }} />
 }
