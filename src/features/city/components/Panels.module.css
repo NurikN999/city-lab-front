@@ -454,3 +454,19 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+.allDistricts {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.allDistricts select {
+  min-height: 2.5rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  background: var(--surface);
+  color: var(--text);
+}

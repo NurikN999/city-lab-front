@@ -27,6 +27,15 @@ export function ProblemsPanel({ districts, values, metric, onSelect }: ProblemsP
           </span>
         </button>
       ))}
+      <label className={styles.allDistricts}>
+        Все районы
+        <select value="" onChange={(event) => event.target.value && onSelect(Number(event.target.value))}>
+          <option value="">Выберите район…</option>
+          {districts.map((district) => (
+            <option key={district.id} value={district.id}>{district.name}</option>
+          ))}
+        </select>
+      </label>
     </section>
   )
 }
