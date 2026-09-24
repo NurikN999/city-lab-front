@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
-import type { Action, AiPlanResponse, BusRoute, CityResponse, LatLng, MetricValues, ScenarioWithResult } from '../../shared/lib/schemas'
+import type { Action, BusRoute, CityResponse, LatLng, MetricValues } from '../../shared/lib/schemas'
 import { AiBar } from './components/AiBar'
 import { AiResults } from './components/AiResults'
 import { CityKpiPanel } from './components/CityKpiPanel'
@@ -18,12 +18,8 @@ import { LAYERS, type LayerSphere } from './layers'
 import styles from './CityPage.module.css'
 import { valuesById } from './rank'
 import { chooseRoute, emptyDraft, toggleAction, type Draft } from './scenario'
+import { afterAiPlan, afterSimulation, type View } from './view'
 
-type View =
-  | { mode: 'explore' }
-  | { mode: 'district'; districtId: number }
-  | { mode: 'result'; districtId: number; data: ScenarioWithResult }
-  | { mode: 'ai'; data: AiPlanResponse }
 
 type CityScreenProps = { city: CityResponse; actions: Action[]; routes: BusRoute[] }
 
@@ -114,13 +110,14 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
       {view.mode === 'district' && draft && (
         <div className={styles.bottom}>
           <ScenarioTray
+            key={draft.districtId}
             draft={draft}
             actions={actions}
             routes={routes}
             budget={DEFAULT_BUDGET}
             onRemove={toggle}
             onSimulated={(data) => {
-              setView({ mode: 'result', districtId: draft.districtId, data })
+              setView((current) => afterSimulation(current, draft.districtId, data))
               setScenariosVersion((v) => v + 1)
             }}
           />
@@ -128,7 +125,7 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
       )}
       {view.mode !== 'district' && (
         <div className={styles.bottom}>
-          <AiBar onResult={(data) => { setView({ mode: 'ai', data }); setScenariosVersion((v) => v + 1) }} />
+          <AiBar onResult={(data) => { setView((current) => afterAiPlan(current, data)); setScenariosVersion((v) => v + 1) }} />
         </div>
       )}
       {view.mode === 'ai' && (
