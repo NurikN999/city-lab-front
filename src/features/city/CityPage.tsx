@@ -1,27 +1,58 @@
 import { useState } from 'react'
-import type { Action, BusRoute, CityResponse } from '../../shared/lib/schemas'
+import { DEFAULT_BUDGET } from '../../shared/lib/format'
+import type { Action, BusRoute, CityResponse, ScenarioWithResult } from '../../shared/lib/schemas'
 import { CityKpiPanel } from './components/CityKpiPanel'
 import { CityMap } from './components/CityMap'
+import { DistrictPanel } from './components/DistrictPanel'
 import { Legend } from './components/Legend'
 import { LayerSwitch } from './components/LayerSwitch'
 import { ProblemsPanel } from './components/ProblemsPanel'
+import { ScenarioTray } from './components/ScenarioTray'
+import type { RouteLayer } from './geo'
 import { useCityData } from './hooks/useCityData'
 import { LAYERS, type LayerSphere } from './layers'
 import styles from './CityPage.module.css'
 import { valuesById } from './rank'
+import { chooseRoute, emptyDraft, toggleAction, type Draft } from './scenario'
 
-type View = { mode: 'explore' } | { mode: 'district'; districtId: number }
+type View =
+  | { mode: 'explore' }
+  | { mode: 'district'; districtId: number }
+  | { mode: 'result'; districtId: number; data: ScenarioWithResult }
 
 type CityScreenProps = { city: CityResponse; actions: Action[]; routes: BusRoute[] }
 
-function CityScreen({ city }: CityScreenProps) {
+function CityScreen({ city, actions, routes }: CityScreenProps) {
   const [sphere, setSphere] = useState<LayerSphere>('transport')
   const [view, setView] = useState<View>({ mode: 'explore' })
+  const [draft, setDraft] = useState<Draft | null>(null)
 
   const layer = LAYERS.find((l) => l.sphere === sphere) ?? LAYERS[0]
   const metric = city.metrics.find((m) => m.key === layer.metric) ?? city.metrics[0]
   const baseValues = valuesById(city.districts)
   const selectedId = view.mode === 'explore' ? null : view.districtId
+  const district = city.districts.find((d) => d.id === selectedId)
+
+  function selectDistrict(id: number) {
+    setView({ mode: 'district', districtId: id })
+    setDraft(emptyDraft(id))
+  }
+
+  function toggle(action: Action) {
+    // Функциональное обновление: два быстрых клика не перетирают друг друга
+    setDraft((current) => {
+      if (!current) return current
+      const defaultRoute = routes.find((r) => r.district_ids.includes(current.districtId))?.id ?? null
+      return toggleAction(current, action, defaultRoute)
+    })
+  }
+
+  const mapRoutes: RouteLayer[] = view.mode === 'district' && draft
+    ? routes.filter((r) => r.district_ids.includes(draft.districtId)).map((route) => ({
+        route,
+        emphasis: draft.routeId === route.id ? 'selected' : 'option',
+      }))
+    : []
 
   return (
     <div className={styles.screen}>
@@ -31,16 +62,44 @@ function CityScreen({ city }: CityScreenProps) {
         values={baseValues}
         ghostValues={null}
         selectedId={selectedId}
-        routes={[]}
+        routes={mapRoutes}
         coverageStops={[]}
         animateBuses={false}
-        onSelectDistrict={(id) => setView({ mode: 'district', districtId: id })}
+        onSelectDistrict={selectDistrict}
       />
       <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>
       <div className={styles.left}>
-        <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={(id) => setView({ mode: 'district', districtId: id })} />
+        <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
       </div>
-      <div className={styles.right}><CityKpiPanel metrics={city.metrics} city={city.city} /></div>
+      <div className={styles.right}>
+        {view.mode === 'district' && district && draft ? (
+          <DistrictPanel
+            key={district.id}
+            district={district}
+            metrics={city.metrics}
+            actions={actions}
+            routes={routes}
+            draft={draft}
+            onToggle={toggle}
+            onChooseRoute={(routeId) => setDraft((current) => current && chooseRoute(current, routeId))}
+            onClose={() => setView({ mode: 'explore' })}
+          />
+        ) : (
+          <CityKpiPanel metrics={city.metrics} city={city.city} />
+        )}
+      </div>
+      {view.mode === 'district' && draft && (
+        <div className={styles.bottom}>
+          <ScenarioTray
+            draft={draft}
+            actions={actions}
+            routes={routes}
+            budget={DEFAULT_BUDGET}
+            onRemove={toggle}
+            onSimulated={(data) => setView({ mode: 'result', districtId: draft.districtId, data })}
+          />
+        </div>
+      )}
       <div className={styles.bottomLeft}><Legend metric={metric} /></div>
     </div>
   )
