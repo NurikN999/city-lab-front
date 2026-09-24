@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
 import type { Action, BusRoute, CityResponse, LatLng, MetricValues } from '../../shared/lib/schemas'
 import { AiBar } from './components/AiBar'
@@ -13,10 +13,9 @@ import { MyScenarios } from './components/MyScenarios'
 import { ProblemsPanel } from './components/ProblemsPanel'
 import { ResultPanel } from './components/ResultPanel'
 import { ScenarioTray } from './components/ScenarioTray'
-import { previewRoute } from './api'
-import { addPoint, undoPoint, type PreviewState } from './drawing'
 import type { RouteLayer } from './geo'
 import { useCityData } from './hooks/useCityData'
+import { useRouteDrawing } from './hooks/useRouteDrawing'
 import { LAYERS, type LayerSphere } from './layers'
 import styles from './CityPage.module.css'
 import { valuesById } from './rank'
@@ -32,9 +31,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [scenariosVersion, setScenariosVersion] = useState(0)
   const [customRoutes, setCustomRoutes] = useState<BusRoute[]>([])
-  const [drawPoints, setDrawPoints] = useState<LatLng[]>([])
-  const [preview, setPreview] = useState<PreviewState>({ status: 'idle' })
-  const previewRequest = useRef<AbortController | null>(null)
+  const drawing = useRouteDrawing()
 
   // Новые маршруты добавляем локально: перезапрос /routes перевёл бы весь экран в «загрузку» и сбросил черновик
   const routes = [...loadedRoutes, ...customRoutes]
@@ -60,50 +57,24 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     })
   }
 
-  function requestPreview(points: LatLng[]) {
-    previewRequest.current?.abort()
-    if (points.length < 2) {
-      setPreview({ status: 'idle' })
-      return
-    }
-    const controller = new AbortController()
-    previewRequest.current = controller
-    setPreview({ status: 'loading' })
-    previewRoute(points, controller.signal)
-      .then((data) => setPreview({ status: 'ready', data }))
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setPreview({ status: 'error', error: error instanceof Error ? error.message : String(error) })
-      })
-  }
-
   function startDrawing() {
     if (!draft) return
-    setDrawPoints([])
-    setPreview({ status: 'idle' })
+    drawing.reset()
     setView({ mode: 'draw', districtId: draft.districtId })
   }
 
   function handleMapClick(point: LatLng) {
-    if (view.mode !== 'draw') return
-    const next = addPoint(drawPoints, point)
-    setDrawPoints(next)
-    requestPreview(next)
-  }
-
-  function undoLastPoint() {
-    const next = undoPoint(drawPoints)
-    setDrawPoints(next)
-    requestPreview(next)
+    if (view.mode === 'draw') drawing.add(point)
   }
 
   function leaveDrawing() {
-    previewRequest.current?.abort()
+    drawing.stop()
     setView((current) => (current.mode === 'draw' ? { mode: 'district', districtId: current.districtId } : current))
   }
 
-  function handleRouteSaved(route: BusRoute) {
+  function handleRouteSaved(route: BusRoute, districtId: number) {
     setCustomRoutes((current) => [...current, route])
-    if (routeAction) setDraft((current) => current && withRoute(current, routeAction, route.id))
+    if (routeAction) setDraft((current) => current && withRoute(current, routeAction, route.id, districtId))
     leaveDrawing()
   }
 
@@ -134,7 +105,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         coverageStops={coverageStops}
         animateBuses={isResult}
         onSelectDistrict={selectDistrict}
-        drawing={view.mode === 'draw' ? { points: drawPoints, path: preview.status === 'ready' ? preview.data.path.coordinates : null } : null}
+        drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.preview.status === 'ready' ? drawing.preview.data.path.coordinates : null } : null}
         onMapClick={handleMapClick}
       />
       <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>
@@ -146,11 +117,11 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         {view.mode === 'draw' && district ? (
           <DrawPanel
             districtName={district.name}
-            points={drawPoints}
-            preview={preview}
-            onUndo={undoLastPoint}
+            points={drawing.points}
+            preview={drawing.preview}
+            onUndo={drawing.undo}
             onCancel={leaveDrawing}
-            onSaved={handleRouteSaved}
+            onSaved={(route) => handleRouteSaved(route, view.districtId)}
           />
         ) : view.mode === 'result' && district ? (
           <ResultPanel

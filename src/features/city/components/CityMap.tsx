@@ -164,6 +164,9 @@ export function CityMap(props: CityMapProps) {
   useEffect(() => {
     if (!map) return
     map.getCanvas().style.cursor = isDrawing ? 'crosshair' : ''
+    // Двойной клик в режиме рисования — это две остановки, а не зум
+    if (isDrawing) map.doubleClickZoom.disable()
+    else map.doubleClickZoom.enable()
     // Столбики не должны закрывать рисуемую линию
     map.setPaintProperty('columns', 'fill-extrusion-opacity', isDrawing ? 0.2 : 0.9)
   }, [map, isDrawing])

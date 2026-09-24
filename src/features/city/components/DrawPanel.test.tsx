@@ -39,4 +39,11 @@ describe('DrawPanel', () => {
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 42 })))
   })
+
+  it('tells the user when the stop limit is reached', () => {
+    const full = Array.from({ length: 25 }, (_, i) => ({ lat: 43.6 + i / 1000, lng: 51.16 }))
+    render(<DrawPanel districtName="12 мкр" points={full} preview={{ status: 'idle' }} onUndo={vi.fn()} onCancel={vi.fn()} onSaved={vi.fn()} />)
+
+    expect(screen.getByText('Максимум 25 остановок.')).toBeInTheDocument()
+  })
 })

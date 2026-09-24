@@ -2,7 +2,7 @@ import { useActionState, useState } from 'react'
 import { ApiError } from '../../../shared/lib/api'
 import type { BusRoute, LatLng } from '../../../shared/lib/schemas'
 import { saveRoute } from '../api'
-import { canSave, pathLengthKm, type PreviewState } from '../drawing'
+import { canSave, MAX_POINTS, pathLengthKm, type PreviewState } from '../drawing'
 import styles from './Panels.module.css'
 
 type DrawPanelProps = {
@@ -41,6 +41,7 @@ export function DrawPanel({ districtName, points, preview, onUndo, onCancel, onS
           <dd>{preview.status === 'ready' ? `${pathLengthKm(preview.data.path.coordinates).toFixed(1)} км` : '—'}</dd>
         </div>
       </dl>
+      {points.length >= MAX_POINTS && <p className={styles.hint}>Максимум {MAX_POINTS} остановок.</p>}
       {preview.status === 'loading' && <p className={styles.hint}>Строим путь по дорогам…</p>}
       {preview.status === 'ready' && !preview.data.snapped && (
         <p className={styles.error}>Линия прямая — роутинг по дорогам сейчас недоступен.</p>

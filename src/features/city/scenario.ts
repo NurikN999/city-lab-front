@@ -39,7 +39,9 @@ export function draftName(draft: Draft, actions: Action[], routes: BusRoute[]): 
     .slice(0, 120)
 }
 
-export function withRoute(draft: Draft, routeAction: Action, routeId: number): Draft {
+/** districtId — район, в котором рисовали: поздний ответ сохранения не попадает в черновик другого района. */
+export function withRoute(draft: Draft, routeAction: Action, routeId: number, districtId: number): Draft {
+  if (draft.districtId !== districtId) return draft
   const actionIds = draft.actionIds.includes(routeAction.id) ? draft.actionIds : [...draft.actionIds, routeAction.id]
   return { ...draft, actionIds, routeId }
 }

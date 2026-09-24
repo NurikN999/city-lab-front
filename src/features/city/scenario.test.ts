@@ -40,8 +40,12 @@ describe('scenario draft', () => {
   })
 
   it('puts a freshly drawn route into the draft', () => {
-    expect(withRoute(emptyDraft(11), routeAction, 42)).toEqual({ districtId: 11, actionIds: [1], routeId: 42 })
+    expect(withRoute(emptyDraft(11), routeAction, 42, 11)).toEqual({ districtId: 11, actionIds: [1], routeId: 42 })
     const already = toggleAction(emptyDraft(11), routeAction, 2)
-    expect(withRoute(already, routeAction, 42)).toEqual({ districtId: 11, actionIds: [1], routeId: 42 })
+    expect(withRoute(already, routeAction, 42, 11)).toEqual({ districtId: 11, actionIds: [1], routeId: 42 })
+  })
+
+  it('keeps a late saved route out of another district draft', () => {
+    expect(withRoute(emptyDraft(11), routeAction, 42, 7)).toEqual(emptyDraft(11))
   })
 })
