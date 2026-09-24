@@ -1,8 +1,31 @@
 :root {
-  --text: #1f2328;
-  --bg: #fff;
+  --bg: #f4efe6;
+  --surface: #fff;
+  --line: #e3dccf;
+  --text: #16232e;
+  --muted: #5a6670;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --accent: #0b6e78;
+  --accent-hover: #08525a;
+  --accent-soft: #e3f2f3;
+
+  --good: #0b6e78;
+  --mid: #e8a33d;
+  --bad: #c2410c;
+  --good-soft: #d3ecee;
+  --mid-soft: #fbf1dd;
+  --bad-soft: #fbede6;
+  --mid-text: #7a4a05;
+  --bad-text: #9a3309;
+
+  --route: #2952cc;
+  --route-soft: #e6ecfb;
+
+  --radius: 1rem;
+  --shadow: 0 0.5rem 1.5rem rgb(22 35 46 / 0.08);
+
+  --sans: 'Golos Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Unbounded', var(--sans);
 
   font: 1rem/1.45 var(--sans);
   color: var(--text);
@@ -12,4 +35,25 @@
 
 body {
   margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--route);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
