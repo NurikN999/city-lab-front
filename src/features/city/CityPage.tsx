@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
-import type { Action, BusRoute, CityResponse, ScenarioWithResult } from '../../shared/lib/schemas'
+import type { Action, BusRoute, CityResponse, LatLng, MetricValues, ScenarioWithResult } from '../../shared/lib/schemas'
 import { CityKpiPanel } from './components/CityKpiPanel'
 import { CityMap } from './components/CityMap'
 import { DistrictPanel } from './components/DistrictPanel'
 import { Legend } from './components/Legend'
 import { LayerSwitch } from './components/LayerSwitch'
+import { MyScenarios } from './components/MyScenarios'
 import { ProblemsPanel } from './components/ProblemsPanel'
+import { ResultPanel } from './components/ResultPanel'
 import { ScenarioTray } from './components/ScenarioTray'
 import type { RouteLayer } from './geo'
 import { useCityData } from './hooks/useCityData'
@@ -26,6 +28,7 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
   const [sphere, setSphere] = useState<LayerSphere>('transport')
   const [view, setView] = useState<View>({ mode: 'explore' })
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [scenariosVersion, setScenariosVersion] = useState(0)
 
   const layer = LAYERS.find((l) => l.sphere === sphere) ?? LAYERS[0]
   const metric = city.metrics.find((m) => m.key === layer.metric) ?? city.metrics[0]
@@ -54,25 +57,42 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
       }))
     : []
 
+  const isResult = view.mode === 'result'
+  const shownValues: Record<string, MetricValues> = isResult ? view.data.result.after.districts : baseValues
+  const ghostValues = isResult ? view.data.result.before.districts : null
+  const resultRouteId = isResult ? (view.data.scenario.items.find((i) => i.route_id !== null)?.route_id ?? null) : null
+  const resultRoute = routes.find((r) => r.id === resultRouteId)
+  const coverageStops: LatLng[] = resultRoute ? resultRoute.stops.map(({ lat, lng }) => ({ lat, lng })) : []
+  const routesOnMap: RouteLayer[] = resultRoute ? [{ route: resultRoute, emphasis: 'selected' }] : mapRoutes
+
   return (
     <div className={styles.screen}>
       <CityMap
         districts={city.districts}
         metric={metric}
-        values={baseValues}
-        ghostValues={null}
+        values={shownValues}
+        ghostValues={ghostValues}
         selectedId={selectedId}
-        routes={mapRoutes}
-        coverageStops={[]}
-        animateBuses={false}
+        routes={routesOnMap}
+        coverageStops={coverageStops}
+        animateBuses={isResult}
         onSelectDistrict={selectDistrict}
       />
       <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>
-      <div className={styles.left}>
+      <div className={`${styles.left} ${styles.stack}`}>
         <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
+        <MyScenarios reloadKey={scenariosVersion} />
       </div>
       <div className={styles.right}>
-        {view.mode === 'district' && district && draft ? (
+        {view.mode === 'result' && district ? (
+          <ResultPanel
+            data={view.data}
+            metrics={city.metrics}
+            districtName={district.name}
+            onEdit={() => setView({ mode: 'district', districtId: view.districtId })}
+            onClose={() => setView({ mode: 'explore' })}
+          />
+        ) : view.mode === 'district' && district && draft ? (
           <DistrictPanel
             key={district.id}
             district={district}
@@ -96,7 +116,10 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
             routes={routes}
             budget={DEFAULT_BUDGET}
             onRemove={toggle}
-            onSimulated={(data) => setView({ mode: 'result', districtId: draft.districtId, data })}
+            onSimulated={(data) => {
+              setView({ mode: 'result', districtId: draft.districtId, data })
+              setScenariosVersion((v) => v + 1)
+            }}
           />
         </div>
       )}

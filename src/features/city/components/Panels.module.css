@@ -40,8 +40,10 @@
 
 .rowHead {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.5rem 0.75rem;
   font-weight: 600;
 }
 
@@ -288,4 +290,98 @@
   .metricGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.deltas {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.deltas th,
+.deltas td {
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+
+.deltas th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.deltaGood,
+.deltaBad,
+.deltaFlat {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.deltaGood { background: var(--good-soft); color: var(--good); }
+.deltaBad { background: var(--bad-soft); color: var(--bad-text); }
+.deltaFlat { background: var(--bg); color: var(--muted); }
+
+.assumptions {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.assumptions summary {
+  min-height: 2.5rem;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.assumptions ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.actions3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.primaryLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  background: var(--accent-hover);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.check > span:nth-child(2) {
+  flex: 1;
+}
+
+.aiTag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--route);
 }
