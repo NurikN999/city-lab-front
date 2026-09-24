@@ -140,7 +140,14 @@ export const simulationResultSchema = z.object({
 })
 export type SimulationResult = z.infer<typeof simulationResultSchema>
 
-export const scenarioWithResultSchema = z.object({ scenario: scenarioSchema, result: simulationResultSchema })
+export const contributionSchema = z.object({ label: z.string(), deltas: metricValuesSchema })
+export type Contribution = z.infer<typeof contributionSchema>
+
+export const scenarioWithResultSchema = z.object({
+  scenario: scenarioSchema,
+  result: simulationResultSchema,
+  contributions: z.array(contributionSchema).optional(), // вклад каждого действия в районе фокуса
+})
 export type ScenarioWithResult = z.infer<typeof scenarioWithResultSchema>
 
 export const labeledScenarioSchema = scenarioWithResultSchema.extend({ label: z.enum(['A', 'B', 'C']) })
@@ -156,6 +163,7 @@ export const aiPlanResponseSchema = z.object({
   intent: z.object({
     district_id: z.number(),
     district_name: z.string(),
+    district_auto: z.boolean().optional(), // район не назван — движок взял самый проблемный
     goals: z.array(goalSchema),
     budget: z.number(),
     fallback: z.boolean(),

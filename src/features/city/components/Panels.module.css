@@ -511,3 +511,23 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+.why {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+}
+
+.why dt {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.why dd {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}

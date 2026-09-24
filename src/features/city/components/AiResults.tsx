@@ -16,7 +16,7 @@ export function AiResults({ data, metrics, onClose }: { data: AiPlanResponse; me
         <button type="button" className={styles.remove} aria-label="Закрыть City AI" onClick={onClose}>×</button>
       </div>
       <ul className={styles.trayChips} aria-label="Понял запрос">
-        <li className={styles.trayChip}>Район: {data.intent.district_name}</li>
+        <li className={styles.trayChip}>Район: {data.intent.district_name}{data.intent.district_auto && ' — самый проблемный'}</li>
         {data.intent.goals.map((g) => (
           <li key={g.metric} className={styles.trayChip}>{metricName(g.metric)} {g.direction === 'decrease' ? '↓' : '↑'}{g.weight < 1 ? ` · вес ${g.weight}` : ''}</li>
         ))}

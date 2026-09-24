@@ -3,6 +3,7 @@ import { compareHref } from '../../../app/useHashRoute'
 import { deltaRows } from '../../../shared/lib/deltas'
 import { formatDelta, formatMoney } from '../../../shared/lib/format'
 import type { Metric, ScenarioWithResult } from '../../../shared/lib/schemas'
+import { whyRows } from '../why'
 import styles from './Panels.module.css'
 
 type ResultPanelProps = {
@@ -16,6 +17,8 @@ type ResultPanelProps = {
 export function ResultPanel({ data, metrics, districtName, onEdit, onClose }: ResultPanelProps) {
   const [scope, setScope] = useState<'district' | 'city'>('district')
   const rows = deltaRows(data.result, metrics, scope === 'district' ? data.scenario.district_id : null)
+  const why = scope === 'district' ? whyRows(rows, data.contributions ?? []) : []
+  const metricName = (key: string) => metrics.find((m) => m.key === key)?.name ?? key
 
   return (
     <section className={styles.panel} aria-labelledby="result-title">
@@ -44,6 +47,21 @@ export function ResultPanel({ data, metrics, districtName, onEdit, onClose }: Re
         </tbody>
       </table>
 
+      {why.length > 0 && (
+        <details open className={styles.assumptions}>
+          <summary>Почему так изменилось</summary>
+          <dl className={styles.why}>
+            {why.map((row) => (
+              <div key={row.metric.key}>
+                <dt><span>{row.metric.name}</span><span className={row.improved ? styles.deltaGood : styles.deltaBad}>{formatDelta(row.delta)}</span></dt>
+                <dd>{row.causes.length > 0 ? row.causes.map((c) => `${c.label} ${formatDelta(c.delta)}`).join(' · ') : 'через связи с другими метриками'}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className={styles.hint}>Вклад — насколько иначе было бы без этого действия. Считает движок на правилах, коэффициенты открыты на странице <a href="#/model">«Модель»</a>.</p>
+        </details>
+      )}
+
       <details open className={styles.assumptions}>
         <summary>Допущения модели</summary>
         <ul>
@@ -51,7 +69,7 @@ export function ResultPanel({ data, metrics, districtName, onEdit, onClose }: Re
             <li key={a.key}><strong>{a.name}:</strong> {a.assumption}{a.source_url && <> · <a href={a.source_url} target="_blank" rel="noreferrer">источник</a></>}</li>
           ))}
           {data.result.assumptions.couplings.map((c) => (
-            <li key={`${c.source}-${c.target}`}><strong>Связь {c.source} → {c.target}:</strong> коэффициент {c.factor}</li>
+            <li key={`${c.source}-${c.target}`}><strong>Связь {metricName(c.source)} → {metricName(c.target)}:</strong> коэффициент {c.factor}</li>
           ))}
         </ul>
       </details>
