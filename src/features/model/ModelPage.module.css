@@ -77,6 +77,15 @@
   color: var(--muted);
 }
 
+.field select {
+  min-height: 2.5rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .field input {
   min-height: 2.5rem;
   width: 7rem;

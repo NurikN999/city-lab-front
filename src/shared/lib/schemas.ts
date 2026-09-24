@@ -41,6 +41,9 @@ export const districtSchema = z.object({
 })
 export type District = z.infer<typeof districtSchema>
 
+export const districtUpdateSchema = z.object({ id: z.number(), population: z.number(), values: metricValuesSchema })
+export type DistrictUpdate = z.infer<typeof districtUpdateSchema>
+
 export const cityResponseSchema = z.object({
   spheres: z.array(sphereSchema),
   metrics: z.array(metricSchema),

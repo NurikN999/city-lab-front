@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useFetch } from '../../shared/hooks/useFetch'
-import { actionsSchema, modelResponseSchema } from '../../shared/lib/schemas'
+import { actionsSchema, cityResponseSchema, modelResponseSchema } from '../../shared/lib/schemas'
 import { ActionRow } from './ActionRow'
+import { DistrictEditor } from './DistrictEditor'
 import { LoginForm } from './LoginForm'
 import styles from './ModelPage.module.css'
 import { clearToken, readToken } from './session'
@@ -11,6 +12,9 @@ function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void 
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const actions = useFetch('/actions', actionsSchema, version)
   const model = useFetch('/model', modelResponseSchema)
+  const city = useFetch('/city', cityResponseSchema)
+  const metricName = (key: string) => (city.status === 'success' ? city.data.metrics.find((m) => m.key === key)?.name : undefined) ?? key
+  const markSaved = () => { setVersion((v) => v + 1); setSavedAt(new Date().toLocaleTimeString('ru-RU')) }
 
   return (
     <div className={styles.page}>
@@ -39,7 +43,7 @@ function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void 
                     key={action.id}
                     action={action}
                     token={token}
-                    onSaved={() => { setVersion((v) => v + 1); setSavedAt(new Date().toLocaleTimeString('ru-RU')) }}
+                    onSaved={markSaved}
                     onUnauthorized={onLogout}
                   />
                 ))}
@@ -49,12 +53,20 @@ function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void 
         </section>
 
         <aside className={styles.side}>
+          <section className={styles.card} aria-labelledby="districts-title">
+            <h2 id="districts-title" className={styles.cardTitle}>Районы: базовые значения</h2>
+            {city.status === 'loading' && <p className={styles.hint}>Загрузка…</p>}
+            {city.status === 'error' && <p role="alert" className={styles.error}>{city.error}</p>}
+            {city.status === 'success' && (
+              <DistrictEditor districts={city.data.districts} metrics={city.data.metrics} token={token} onSaved={markSaved} onUnauthorized={onLogout} />
+            )}
+          </section>
           <section className={styles.card} aria-labelledby="rules-title">
             <h2 id="rules-title" className={styles.cardTitle}>Правила движка</h2>
             {model.status === 'success' && (
               <dl className={styles.rules}>
                 {model.data.couplings.map((c) => (
-                  <div key={`${c.source}-${c.target}`}><dt>{c.source} → {c.target}</dt><dd>{c.factor}</dd></div>
+                  <div key={`${c.source}-${c.target}`}><dt>{metricName(c.source)} → {metricName(c.target)}</dt><dd>{c.factor}</dd></div>
                 ))}
                 <div><dt>Повтор действия в районе</dt><dd>× {model.data.constants.diminishing_factor}</dd></div>
                 <div><dt>Радиус «соседей»</dt><dd>{model.data.constants.neighbor_radius_m} м</dd></div>
@@ -64,8 +76,8 @@ function ModelEditor({ token, onLogout }: { token: string; onLogout: () => void 
             {model.status === 'error' && <p role="alert" className={styles.error}>{model.error}</p>}
           </section>
           <section className={`${styles.card} ${styles.demo}`}>
-            <h2 className={styles.cardTitle}>Стоимости — демо</h2>
-            <p className={styles.hint}>Перед пилотом заменяются данными открытого бюджета и управлений акимата.</p>
+            <h2 className={styles.cardTitle}>Данные — демо</h2>
+            <p className={styles.hint}>Стоимости и базовые значения — демо, население — оценка по площади района. Перед пилотом заменяются данными управлений акимата и stat.gov.kz.</p>
           </section>
         </aside>
       </div>
