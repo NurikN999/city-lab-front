@@ -162,7 +162,10 @@ export function CityMap(props: CityMapProps) {
   }, [map, districts, selectedId])
 
   useEffect(() => {
-    if (map) map.getCanvas().style.cursor = isDrawing ? 'crosshair' : ''
+    if (!map) return
+    map.getCanvas().style.cursor = isDrawing ? 'crosshair' : ''
+    // Столбики не должны закрывать рисуемую линию
+    map.setPaintProperty('columns', 'fill-extrusion-opacity', isDrawing ? 0.2 : 0.9)
   }, [map, isDrawing])
 
   useEffect(() => {
