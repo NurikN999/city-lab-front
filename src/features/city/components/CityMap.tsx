@@ -4,7 +4,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { District, LatLng, Metric, MetricValues } from '../../../shared/lib/schemas'
 import {
-  busCollection, columnCollection, coverageCollection, districtCollection, EMPTY,
+  busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
   labelCollection, lineCollection, numberedStops, routeCollection, stopCollection, type RouteLayer,
 } from '../geo'
 import styles from './CityMap.module.css'
@@ -64,11 +64,12 @@ function addLayers(map: MapLibreMap) {
   })
   map.addLayer({
     id: 'ghost-columns', type: 'fill-extrusion', source: 'ghosts',
-    paint: { 'fill-extrusion-color': bad, 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.25 },
+    paint: { 'fill-extrusion-color': bad, 'fill-extrusion-base': ['get', 'base'], 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.3 },
   })
   map.addLayer({
     id: 'columns', type: 'fill-extrusion', source: 'columns',
-    paint: { 'fill-extrusion-color': byLevel, 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.9 },
+    // Непрозрачные: полупрозрачный столбик просвечивает 3D-зданиями внутри квадрата
+    paint: { 'fill-extrusion-color': byLevel, 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 1 },
   })
   map.addLayer({
     id: 'buses', type: 'circle', source: 'buses',
@@ -148,7 +149,7 @@ export function CityMap(props: CityMapProps) {
     map.getSource<GeoJSONSource>('districts')?.setData(districtCollection(districts, values, metric, selectedId))
     map.getSource<GeoJSONSource>('labels')?.setData(labelCollection(districts, values, metric))
     map.getSource<GeoJSONSource>('columns')?.setData(columnCollection(districts, values, metric))
-    map.getSource<GeoJSONSource>('ghosts')?.setData(ghostValues ? columnCollection(districts, ghostValues, metric) : EMPTY)
+    map.getSource<GeoJSONSource>('ghosts')?.setData(ghostValues ? ghostCollection(districts, ghostValues, values, metric) : EMPTY)
     map.getSource<GeoJSONSource>('routes')?.setData(routeCollection(routes))
     map.getSource<GeoJSONSource>('stops')?.setData(stopCollection(routes))
     map.getSource<GeoJSONSource>('coverage')?.setData(coverageCollection(coverageStops, STOP_RADIUS_M))
@@ -168,7 +169,7 @@ export function CityMap(props: CityMapProps) {
     if (isDrawing) map.doubleClickZoom.disable()
     else map.doubleClickZoom.enable()
     // Столбики не должны закрывать рисуемую линию
-    map.setPaintProperty('columns', 'fill-extrusion-opacity', isDrawing ? 0.2 : 0.9)
+    map.setPaintProperty('columns', 'fill-extrusion-opacity', isDrawing ? 0.2 : 1)
   }, [map, isDrawing])
 
   useEffect(() => {

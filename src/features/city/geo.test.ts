@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Metric } from '../../shared/lib/schemas'
-import { busCollection, circlePolygon, columnCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
+import { busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
 
 const traffic: Metric = { key: 'traffic', name: 'Загрузка дорог', unit: '%', sphere: 'transport', lower_is_better: true, min: 0, max: 100, is_computed: false }
 
@@ -80,5 +80,20 @@ describe('geo', () => {
     expect(lineCollection(null).features).toHaveLength(0)
     expect(lineCollection([[51.16, 43.66]]).features).toHaveLength(0)
     expect(lineCollection([[51.16, 43.66], [51.17, 43.67]]).features[0].geometry.type).toBe('LineString')
+  })
+
+  it('draws the lost part as a wider cap above the current column', () => {
+    const ghost = ghostCollection([district], { '11': { traffic: 80 } }, { '11': { traffic: 50 } }, traffic).features[0]
+    const column = columnCollection([district], { '11': { traffic: 50 } }, traffic).features[0]
+    const width = (ring: number[][]) => metersBetween(ring[0], ring[1])
+
+    expect(ghost.properties.height).toBe(640)
+    expect(ghost.properties.base).toBeGreaterThan(400) // выше верха текущего столбика — общих граней нет
+    expect(width(ghost.geometry.coordinates[0])).toBeGreaterThan(width(column.geometry.coordinates[0]))
+  })
+
+  it('has no cap when the district did not improve', () => {
+    expect(ghostCollection([district], { '11': { traffic: 50 } }, { '11': { traffic: 50 } }, traffic).features).toHaveLength(0)
+    expect(ghostCollection([district], { '11': { traffic: 40 } }, { '11': { traffic: 50 } }, traffic).features).toHaveLength(0)
   })
 })

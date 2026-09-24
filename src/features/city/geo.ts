@@ -55,6 +55,21 @@ export function labelCollection(
   }))
 }
 
+const GHOST_HALF_SIDE_M = 78 // шире столбика: грани не совпадают
+const GHOST_GAP_M = 4 // зазор над верхом столбика: верхние грани не совпадают
+
+function square(center: LatLng, halfSideM: number): Polygon {
+  const { lat, lng } = center
+  const dLat = halfSideM / METERS_PER_DEG_LAT
+  const dLng = halfSideM / metersPerDegLng(lat)
+  return {
+    type: 'Polygon',
+    coordinates: [[[lng - dLng, lat - dLat], [lng + dLng, lat - dLat], [lng + dLng, lat + dLat], [lng - dLng, lat + dLat], [lng - dLng, lat - dLat]]],
+  }
+}
+
+const columnHeight = (value: number, metric: Metric) => Math.max(0, badness(value, metric)) * COLUMN_METERS_PER_POINT
+
 export function columnCollection(
   districts: District[],
   values: Record<string, MetricValues>,
@@ -64,17 +79,31 @@ export function columnCollection(
   for (const district of districts) {
     const value = valueOf(values, district, metric)
     if (value === undefined) continue
-    const { lat, lng } = district.center
-    const dLat = COLUMN_HALF_SIDE_M / METERS_PER_DEG_LAT
-    const dLng = COLUMN_HALF_SIDE_M / metersPerDegLng(lat)
     features.push({
       type: 'Feature',
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[[lng - dLng, lat - dLat], [lng + dLng, lat - dLat], [lng + dLng, lat + dLat], [lng - dLng, lat + dLat], [lng - dLng, lat - dLat]]],
-      },
-      properties: { id: district.id, height: Math.max(0, badness(value, metric)) * COLUMN_METERS_PER_POINT, level: levelOf(value, metric) },
+      geometry: square(district.center, COLUMN_HALF_SIDE_M),
+      properties: { id: district.id, height: columnHeight(value, metric), level: levelOf(value, metric) },
     })
+  }
+  return collection(features)
+}
+
+/** «Ушедшая» часть столбика: полупрозрачная шапка от текущей высоты до прежней, только если район улучшился. */
+export function ghostCollection(
+  districts: District[],
+  before: Record<string, MetricValues>,
+  current: Record<string, MetricValues>,
+  metric: Metric,
+): FeatureCollection<Polygon, { id: number; base: number; height: number }> {
+  const features: Feature<Polygon, { id: number; base: number; height: number }>[] = []
+  for (const district of districts) {
+    const was = valueOf(before, district, metric)
+    const now = valueOf(current, district, metric)
+    if (was === undefined || now === undefined) continue
+    const base = columnHeight(now, metric) + GHOST_GAP_M
+    const height = columnHeight(was, metric)
+    if (height <= base) continue
+    features.push({ type: 'Feature', geometry: square(district.center, GHOST_HALF_SIDE_M), properties: { id: district.id, base, height } })
   }
   return collection(features)
 }
