@@ -1,75 +1,33 @@
-# React + TypeScript + Vite
+# Aktau City Lab — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite + MapLibre. API: `../city-lab-api/API.md`.
 
-Currently, two official plugins are available:
+## Запуск
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+cp .env.example .env.local   # VITE_API_URL=http://localhost:8091/api
+npm install
+npm run dev                  # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Бэкенд (`city-lab-api`) должен быть поднят в Docker и засеян: `docker exec -u 1000 city-lab-php php artisan migrate:fresh --seed`. Его `FRONTEND_URL` должен совпадать с адресом фронта.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Проверки
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run test && npm run build && npm run lint
 ```
+
+## Деплой (Vercel)
+
+1. Import Project → `city-lab-front`, Framework: Vite.
+2. Environment Variables: `VITE_API_URL=https://<railway-домен>/api`.
+3. На бэкенде в Railway: `FRONTEND_URL=https://<vercel-домен>` (без `/` в конце) → redeploy.
+4. Роутинг на `#/…`, поэтому rewrites не нужны.
+
+## Демо за 4 минуты
+
+1. Слой «Транспорт» → «Проблемы города» → 12 мкр.
+2. Маршрут Б + Умные светофоры + Озеленение → SIMULATE → «До → После», автобусы.
+3. City AI: «Уменьши пробки в 12 мкр и не забудь про жару, бюджет 100 млн» → «Сравнить все 3».
+4. «Модель» → войти → изменить коэффициент → вернуться к сравнению.
