@@ -77,6 +77,14 @@ export const busRouteSchema = z.object({
 export type BusRoute = z.infer<typeof busRouteSchema>
 export const routesSchema = z.array(busRouteSchema)
 
+export const routePreviewSchema = z.object({
+  path: z.object({ type: z.literal('LineString'), coordinates: z.array(lngLat) }),
+  stops: z.array(latLngSchema),
+  snapped: z.boolean(),
+  district_ids: z.array(z.number()),
+})
+export type RoutePreview = z.infer<typeof routePreviewSchema>
+
 export const couplingSchema = z.object({ source: metricKeySchema, target: metricKeySchema, factor: z.number() })
 export type Coupling = z.infer<typeof couplingSchema>
 

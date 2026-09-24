@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Metric } from '../../shared/lib/schemas'
-import { busCollection, circlePolygon, columnCollection, districtCollection, labelCollection, pointAlong, routeCollection } from './geo'
+import { busCollection, circlePolygon, columnCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
 
 const traffic: Metric = { key: 'traffic', name: 'Загрузка дорог', unit: '%', sphere: 'transport', lower_is_better: true, min: 0, max: 100, is_computed: false }
 
@@ -68,5 +68,17 @@ describe('geo', () => {
 
   it('spreads buses evenly', () => {
     expect(busCollection([[0, 0], [3, 0]], 0, 3).features.map((f) => f.geometry.coordinates[0])).toEqual([0, 1, 2])
+  })
+
+  it('numbers drawn stops from one', () => {
+    const fc = numberedStops([{ lat: 43.66, lng: 51.16 }, { lat: 43.67, lng: 51.17 }])
+    expect(fc.features.map((f) => f.properties.label)).toEqual(['1', '2'])
+    expect(fc.features[0].geometry.coordinates).toEqual([51.16, 43.66])
+  })
+
+  it('draws a preview line only for two or more points', () => {
+    expect(lineCollection(null).features).toHaveLength(0)
+    expect(lineCollection([[51.16, 43.66]]).features).toHaveLength(0)
+    expect(lineCollection([[51.16, 43.66], [51.17, 43.67]]).features[0].geometry.type).toBe('LineString')
   })
 })

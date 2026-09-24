@@ -20,4 +20,9 @@ describe('late responses', () => {
     const busy: View = { mode: 'district', districtId: 7 }
     expect(afterAiPlan(busy, plan)).toBe(busy)
   })
+
+  it('does not interrupt route drawing with AI results', () => {
+    const drawing: View = { mode: 'draw', districtId: 7 }
+    expect(afterAiPlan(drawing, plan)).toBe(drawing)
+  })
 })

@@ -38,3 +38,8 @@ export function draftName(draft: Draft, actions: Action[], routes: BusRoute[]): 
     .join(' + ')
     .slice(0, 120)
 }
+
+export function withRoute(draft: Draft, routeAction: Action, routeId: number): Draft {
+  const actionIds = draft.actionIds.includes(routeAction.id) ? draft.actionIds : [...draft.actionIds, routeAction.id]
+  return { ...draft, actionIds, routeId }
+}

@@ -128,3 +128,16 @@ export function busCollection(path: [number, number][], t: number, count = 3): F
     properties: {},
   })))
 }
+
+export function numberedStops(points: LatLng[]): FeatureCollection<Point, { label: string }> {
+  return collection(points.map((point, i) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Point' as const, coordinates: [point.lng, point.lat] },
+    properties: { label: String(i + 1) },
+  })))
+}
+
+export function lineCollection(path: [number, number][] | null): FeatureCollection<LineString> {
+  if (!path || path.length < 2) return collection<LineString, Record<string, never>>([])
+  return collection([{ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: path }, properties: {} }])
+}

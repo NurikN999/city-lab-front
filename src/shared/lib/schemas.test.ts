@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aiPlanResponseSchema, cityResponseSchema, scenarioWithResultSchema } from './schemas'
+import { aiPlanResponseSchema, cityResponseSchema, routePreviewSchema, scenarioWithResultSchema } from './schemas'
 
 const district = {
   id: 11, name: '12 мкр', population: 10000, center: { lat: 43.669365, lng: 51.16699 },
@@ -47,5 +47,15 @@ describe('schemas', () => {
 
   it('rejects a wrong shape', () => {
     expect(cityResponseSchema.safeParse({ ...{ spheres: [], metrics: [], city: {} }, districts: [{ ...district, id: '11' }] }).success).toBe(false)
+  })
+
+  it('parses POST /routes/preview', () => {
+    const parsed = routePreviewSchema.parse({
+      path: { type: 'LineString', coordinates: [[51.16, 43.66], [51.17, 43.67]] },
+      stops: [{ lat: 43.66, lng: 51.16 }],
+      snapped: false,
+      district_ids: [11],
+    })
+    expect(parsed.snapped).toBe(false)
   })
 })

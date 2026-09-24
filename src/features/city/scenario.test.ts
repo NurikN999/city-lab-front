@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Action } from '../../shared/lib/schemas'
-import { chooseRoute, draftCost, draftItems, draftName, emptyDraft, toggleAction } from './scenario'
+import { chooseRoute, draftCost, draftItems, draftName, emptyDraft, toggleAction, withRoute } from './scenario'
 
 const sphere = { key: 'transport' as const, name: 'Транспорт' }
 const routeAction: Action = { id: 1, key: 'new_bus_route', name: 'Новый автобусный маршрут', sphere, cost: 42_000_000, scope: 'route', assumption: '', source_url: null, effects: [] }
@@ -37,5 +37,11 @@ describe('scenario draft', () => {
   it('names the scenario after its parts', () => {
     const draft = toggleAction(toggleAction(emptyDraft(11), routeAction, 2), lights, 2)
     expect(draftName(draft, actions, routes)).toBe('Маршрут Б + Умные светофоры')
+  })
+
+  it('puts a freshly drawn route into the draft', () => {
+    expect(withRoute(emptyDraft(11), routeAction, 42)).toEqual({ districtId: 11, actionIds: [1], routeId: 42 })
+    const already = toggleAction(emptyDraft(11), routeAction, 2)
+    expect(withRoute(already, routeAction, 42)).toEqual({ districtId: 11, actionIds: [1], routeId: 42 })
   })
 })
