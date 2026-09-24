@@ -25,7 +25,7 @@ export function Header({ page }: { page: AppRoute['page'] }) {
           ))}
         </ul>
       </nav>
-      <span className={styles.note}>Демо-данные · схема районов</span>
+      <span className={styles.note}>Районы — OpenStreetMap · метрики — демо</span>
     </header>
   )
 }

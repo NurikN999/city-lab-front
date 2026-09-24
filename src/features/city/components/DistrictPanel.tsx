@@ -25,7 +25,7 @@ export function DistrictPanel({ district, metrics, actions, routes, draft, onTog
       <div className={styles.rowHead}>
         <div>
           <h2 id="district-title" className={styles.title}>{district.name}</h2>
-          <p className={styles.hint}>Население: {district.population.toLocaleString('ru-RU')} · метрики — демо</p>
+          <p className={styles.hint}>Население ≈ {district.population.toLocaleString('ru-RU')} (оценка) · метрики — демо</p>
         </div>
         <button type="button" className={styles.remove} aria-label="Закрыть район" onClick={onClose}>×</button>
       </div>
