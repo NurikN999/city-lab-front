@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
-import type { Action, BusRoute, CityResponse, LatLng, MetricValues, ScenarioWithResult } from '../../shared/lib/schemas'
+import type { Action, AiPlanResponse, BusRoute, CityResponse, LatLng, MetricValues, ScenarioWithResult } from '../../shared/lib/schemas'
+import { AiBar } from './components/AiBar'
+import { AiResults } from './components/AiResults'
 import { CityKpiPanel } from './components/CityKpiPanel'
 import { CityMap } from './components/CityMap'
 import { DistrictPanel } from './components/DistrictPanel'
@@ -21,6 +23,7 @@ type View =
   | { mode: 'explore' }
   | { mode: 'district'; districtId: number }
   | { mode: 'result'; districtId: number; data: ScenarioWithResult }
+  | { mode: 'ai'; data: AiPlanResponse }
 
 type CityScreenProps = { city: CityResponse; actions: Action[]; routes: BusRoute[] }
 
@@ -33,7 +36,7 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
   const layer = LAYERS.find((l) => l.sphere === sphere) ?? LAYERS[0]
   const metric = city.metrics.find((m) => m.key === layer.metric) ?? city.metrics[0]
   const baseValues = valuesById(city.districts)
-  const selectedId = view.mode === 'explore' ? null : view.districtId
+  const selectedId = view.mode === 'explore' || view.mode === 'ai' ? null : view.districtId
   const district = city.districts.find((d) => d.id === selectedId)
 
   function selectDistrict(id: number) {
@@ -121,6 +124,16 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
               setScenariosVersion((v) => v + 1)
             }}
           />
+        </div>
+      )}
+      {view.mode !== 'district' && (
+        <div className={styles.bottom}>
+          <AiBar onResult={(data) => { setView({ mode: 'ai', data }); setScenariosVersion((v) => v + 1) }} />
+        </div>
+      )}
+      {view.mode === 'ai' && (
+        <div className={styles.overlay}>
+          <AiResults data={view.data} metrics={city.metrics} onClose={() => setView({ mode: 'explore' })} />
         </div>
       )}
       <div className={styles.bottomLeft}><Legend metric={metric} /></div>
