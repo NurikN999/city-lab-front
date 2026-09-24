@@ -76,6 +76,8 @@ function CityScreen({ city, actions, routes }: CityScreenProps) {
         coverageStops={coverageStops}
         animateBuses={isResult}
         onSelectDistrict={selectDistrict}
+        drawing={null}
+        onMapClick={() => {}}
       />
       <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>
       <div className={`${styles.left} ${styles.stack}`}>

@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { District, LatLng, Metric, MetricValues } from '../../../shared/lib/schemas'
 import {
   busCollection, columnCollection, coverageCollection, districtCollection, EMPTY,
-  labelCollection, routeCollection, stopCollection, type RouteLayer,
+  labelCollection, lineCollection, numberedStops, routeCollection, stopCollection, type RouteLayer,
 } from '../geo'
 import styles from './CityMap.module.css'
 
@@ -29,6 +29,8 @@ type CityMapProps = {
   coverageStops: LatLng[]
   animateBuses: boolean
   onSelectDistrict: (id: number) => void
+  drawing: { points: LatLng[]; path: [number, number][] | null } | null
+  onMapClick: (point: LatLng) => void
 }
 
 function cssVar(name: string): string {
@@ -39,7 +41,7 @@ function addLayers(map: MapLibreMap) {
   const [good, mid, bad, route, accent, surface, text] = ['--good', '--mid', '--bad', '--route', '--accent', '--surface', '--text'].map(cssVar)
   const byLevel: ExpressionSpecification = ['match', ['get', 'level'], 'good', good, 'mid', mid, bad]
 
-  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses']) {
+  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops']) {
     map.addSource(id, { type: 'geojson', data: EMPTY })
   }
   map.addLayer({ id: 'district-fill', type: 'fill', source: 'districts', paint: { 'fill-color': byLevel, 'fill-opacity': 0.3 } })
@@ -77,17 +79,37 @@ function addLayers(map: MapLibreMap) {
     layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true },
     paint: { 'text-color': text, 'text-halo-color': surface, 'text-halo-width': 2 },
   })
+  map.addLayer({
+    id: 'draft-path', type: 'line', source: 'draft-path',
+    paint: { 'line-color': route, 'line-width': 5, 'line-dasharray': [2, 1] },
+  })
+  map.addLayer({
+    id: 'draft-stops', type: 'circle', source: 'draft-stops',
+    paint: { 'circle-radius': 10, 'circle-color': surface, 'circle-stroke-color': route, 'circle-stroke-width': 3 },
+  })
+  map.addLayer({
+    id: 'draft-labels', type: 'symbol', source: 'draft-stops',
+    layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-allow-overlap': true },
+    paint: { 'text-color': route },
+  })
 }
 
 export function CityMap(props: CityMapProps) {
-  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict } = props
+  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  // Обработчик клика регистрируется один раз при загрузке карты — берём из ref последнюю версию колбэка
+  // Обработчики регистрируются один раз при загрузке карты — берём из ref последние версии
   const onSelectRef = useRef(onSelectDistrict)
+  const onMapClickRef = useRef(onMapClick)
+  const isDrawingRef = useRef(drawing !== null)
   useEffect(() => {
     onSelectRef.current = onSelectDistrict
+    onMapClickRef.current = onMapClick
+    isDrawingRef.current = drawing !== null
   })
+  const isDrawing = drawing !== null
+  const drawPoints = drawing?.points
+  const drawPath = drawing?.path
 
   useEffect(() => {
     const instance = new MapLibreMap({
@@ -102,12 +124,20 @@ export function CityMap(props: CityMapProps) {
     instance.addControl(new NavigationControl({ visualizePitch: true }))
     instance.on('load', () => {
       addLayers(instance)
+      instance.on('click', (event) => {
+        if (isDrawingRef.current) onMapClickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng })
+      })
       instance.on('click', 'district-fill', (event) => {
+        if (isDrawingRef.current) return
         const id: unknown = event.features?.[0]?.properties.id
         if (typeof id === 'number') onSelectRef.current(id)
       })
-      instance.on('mouseenter', 'district-fill', () => { instance.getCanvas().style.cursor = 'pointer' })
-      instance.on('mouseleave', 'district-fill', () => { instance.getCanvas().style.cursor = '' })
+      instance.on('mouseenter', 'district-fill', () => {
+        if (!isDrawingRef.current) instance.getCanvas().style.cursor = 'pointer'
+      })
+      instance.on('mouseleave', 'district-fill', () => {
+        if (!isDrawingRef.current) instance.getCanvas().style.cursor = ''
+      })
       setMap(instance)
     })
     return () => instance.remove()
@@ -130,6 +160,16 @@ export function CityMap(props: CityMapProps) {
     if (selected) map.flyTo({ center: [selected.center.lng, selected.center.lat], zoom: 14.6, pitch: 60 })
     else map.easeTo({ center: AKTAU_CENTER, zoom: 13.2, pitch: 55 })
   }, [map, districts, selectedId])
+
+  useEffect(() => {
+    if (map) map.getCanvas().style.cursor = isDrawing ? 'crosshair' : ''
+  }, [map, isDrawing])
+
+  useEffect(() => {
+    if (!map) return
+    map.getSource<GeoJSONSource>('draft-path')?.setData(lineCollection(drawPath ?? null))
+    map.getSource<GeoJSONSource>('draft-stops')?.setData(numberedStops(drawPoints ?? []))
+  }, [map, drawPoints, drawPath])
 
   useEffect(() => {
     if (!map) return
