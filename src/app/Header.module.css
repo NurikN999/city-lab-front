@@ -66,3 +66,33 @@
     display: block;
   }
 }
+
+@media (max-width: 63.99rem) {
+  /* Одна строка фиксированной высоты: экран города считает от неё высоту карты */
+  .header {
+    flex-wrap: nowrap;
+    height: 3.5rem;
+    min-height: 0;
+    gap: 0.5rem;
+  }
+
+  .link {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.875rem;
+  }
+
+  .note {
+    display: none;
+  }
+}
+
+@media (max-width: 30rem) {
+  .brandText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

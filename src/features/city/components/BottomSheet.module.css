@@ -1,0 +1,60 @@
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 1.25rem 1.25rem 0 0;
+  box-shadow: 0 -0.5rem 1.5rem rgb(22 35 46 / 0.12);
+  transition: height 0.25s ease;
+}
+
+/* Высоты совпадают с snapHeight() в sheet.ts */
+.peek { height: 9.5rem; }
+.half { height: 50%; }
+.full { height: calc(100% - 4.5rem); }
+
+.dragging { transition: none; }
+
+.handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 1.75rem;
+  border: 0;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.grabber {
+  width: 2.5rem;
+  height: 0.3125rem;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.handle:focus-visible .grabber {
+  background: var(--accent);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 1rem 1rem;
+}
+
+.footer {
+  flex: none;
+  padding: 0.5rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet { transition: none; }
+}

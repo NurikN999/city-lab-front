@@ -12,7 +12,7 @@ export function Header({ page }: { page: AppRoute['page'] }) {
     <header className={styles.header}>
       <a href="#/" className={styles.brand}>
         <span className={styles.logo} aria-hidden="true" />
-        Aktau City Lab
+        <span className={styles.brandText}>Aktau City Lab</span>
       </a>
       <nav aria-label="Разделы">
         <ul className={styles.nav}>

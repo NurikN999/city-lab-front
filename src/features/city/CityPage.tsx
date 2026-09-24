@@ -15,21 +15,34 @@ import { ProblemsPanel } from './components/ProblemsPanel'
 import { ResultPanel } from './components/ResultPanel'
 import { ScenarioTray } from './components/ScenarioTray'
 import type { RouteLayer } from './geo'
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery'
+import { BottomSheet } from './components/BottomSheet'
 import { useCityData } from './hooks/useCityData'
 import { useRouteDrawing } from './hooks/useRouteDrawing'
 import { LAYERS, type LayerSphere } from './layers'
 import styles from './CityPage.module.css'
 import { valuesById } from './rank'
+import type { Snap } from './sheet'
 import { useTweenedValues } from './tween'
 import { chooseRoute, emptyDraft, toggleAction, withRoute, type Draft } from './scenario'
 import { afterAiPlan, afterSimulation, type View } from './view'
 
+
+const MOBILE = '(max-width: 63.99rem)'
+const DEFAULT_SNAP: Record<View['mode'], Snap> = { explore: 'peek', district: 'half', result: 'half', ai: 'full', draw: 'peek' }
+type ExploreTab = 'problems' | 'mine' | 'city'
+const EXPLORE_TABS: [ExploreTab, string][] = [['problems', 'Проблемы'], ['mine', 'Сценарии'], ['city', 'Город']]
 
 type CityScreenProps = { city: CityResponse; actions: Action[]; routes: BusRoute[] }
 
 function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const [sphere, setSphere] = useState<LayerSphere>('transport')
   const [view, setView] = useState<View>({ mode: 'explore' })
+  const isMobile = useMediaQuery(MOBILE)
+  const [tab, setTab] = useState<ExploreTab>('problems')
+  // Положение шторки задаёт режим; ручная правка действует, пока режим не сменился
+  const [sheet, setSheet] = useState<{ mode: View['mode']; snap: Snap }>({ mode: 'explore', snap: 'peek' })
+  const snap = sheet.mode === view.mode ? sheet.snap : DEFAULT_SNAP[view.mode]
   const [draft, setDraft] = useState<Draft | null>(null)
   const [scenariosVersion, setScenariosVersion] = useState(0)
   const [customRoutes, setCustomRoutes] = useState<BusRoute[]>([])
@@ -96,96 +109,125 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const coverageStops: LatLng[] = resultRoute ? resultRoute.stops.map(({ lat, lng }) => ({ lat, lng })) : []
   const rightTitle = view.mode === 'draw' ? 'Новый маршрут'
     : view.mode === 'result' ? 'До → После'
+    : view.mode === 'ai' ? 'City AI'
     : view.mode === 'district' && district ? district.name
     : 'Актау сейчас'
   const routesOnMap: RouteLayer[] = resultRoute ? [{ route: resultRoute, emphasis: 'selected' }] : mapRoutes
 
+  const map = (
+    <CityMap
+      districts={city.districts}
+      metric={metric}
+      values={mapValues}
+      ghostValues={ghostValues}
+      selectedId={selectedId}
+      routes={routesOnMap}
+      coverageStops={coverageStops}
+      animateBuses={isResult}
+      onSelectDistrict={selectDistrict}
+      drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.path } : null}
+      onMapClick={handleMapClick}
+      sheetSnap={isMobile ? snap : undefined}
+    />
+  )
+
+  const sidePanel = view.mode === 'draw' && district ? (
+    <DrawPanel
+      districtName={district.name}
+      points={drawing.points}
+      preview={drawing.preview}
+      onUndo={drawing.undo}
+      onCancel={leaveDrawing}
+      onSaved={(route) => handleRouteSaved(route, view.districtId)}
+    />
+  ) : view.mode === 'result' && district ? (
+    <ResultPanel
+      data={view.data}
+      metrics={city.metrics}
+      districtName={district.name}
+      onEdit={() => setView({ mode: 'district', districtId: view.districtId })}
+      onClose={() => setView({ mode: 'explore' })}
+    />
+  ) : view.mode === 'district' && district && draft ? (
+    <DistrictPanel
+      key={district.id}
+      district={district}
+      metrics={city.metrics}
+      actions={actions}
+      routes={routes}
+      draft={draft}
+      onToggle={toggle}
+      onChooseRoute={(routeId) => setDraft((current) => current && chooseRoute(current, routeId))}
+      onClose={() => setView({ mode: 'explore' })}
+      onDrawRoute={startDrawing}
+    />
+  ) : null
+
+  const tray = view.mode === 'district' && draft ? (
+    <ScenarioTray
+      key={draft.districtId}
+      draft={draft}
+      actions={actions}
+      routes={routes}
+      budget={DEFAULT_BUDGET}
+      onRemove={toggle}
+      onSimulated={(data) => {
+        setView((current) => afterSimulation(current, draft.districtId, data))
+        setScenariosVersion((v) => v + 1)
+      }}
+    />
+  ) : null
+
+  const aiBar = <AiBar onResult={(data) => { setView((current) => afterAiPlan(current, data)); setScenariosVersion((v) => v + 1) }} />
+  const aiResults = view.mode === 'ai' ? <AiResults data={view.data} metrics={city.metrics} onClose={() => setView({ mode: 'explore' })} /> : null
+  const problems = <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
+  const mine = <MyScenarios reloadKey={scenariosVersion} />
+  const kpi = <CityKpiPanel metrics={city.metrics} city={city.city} />
+
+  if (isMobile) {
+    return (
+      <div className={styles.mobile}>
+        {map}
+        {view.mode !== 'draw' && <div className={styles.mobileTop}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
+        {view.mode !== 'draw' && <div className={styles.mobileLegend}><Legend metric={metric} compact /></div>}
+        <BottomSheet snap={snap} onSnapChange={(next) => setSheet({ mode: view.mode, snap: next })} label={rightTitle} footer={tray} resetKey={view.mode}>
+          {aiResults ?? sidePanel ?? (
+            <div className={styles.explore}>
+              {aiBar}
+              <div role="tablist" aria-label="Разделы города" className={styles.tabs}>
+                {EXPLORE_TABS.map(([key, label]) => (
+                  <button key={key} type="button" role="tab" aria-selected={tab === key} className={styles.tab} onClick={() => { setTab(key); setSheet({ mode: view.mode, snap: 'half' }) }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div role="tabpanel">{tab === 'problems' ? problems : tab === 'mine' ? mine : kpi}</div>
+            </div>
+          )}
+        </BottomSheet>
+      </div>
+    )
+  }
+
   return (
     <div className={`${styles.screen} ${view.mode === 'draw' ? styles.drawing : ''}`}>
-      <CityMap
-        districts={city.districts}
-        metric={metric}
-        values={mapValues}
-        ghostValues={ghostValues}
-        selectedId={selectedId}
-        routes={routesOnMap}
-        coverageStops={coverageStops}
-        animateBuses={isResult}
-        onSelectDistrict={selectDistrict}
-        drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.path } : null}
-        onMapClick={handleMapClick}
-      />
+      {map}
       {view.mode !== 'draw' && <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
       {view.mode !== 'draw' && (
         // Во время рисования список районов скрыт: выбор другого района стёр бы точки
         <FloatingPanel className={styles.left} title="Проблемы города">
           <div className={styles.stack}>
-            <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
-            <MyScenarios reloadKey={scenariosVersion} />
+            {problems}
+            {mine}
           </div>
         </FloatingPanel>
       )}
       <FloatingPanel className={styles.right} title={rightTitle}>
-        {view.mode === 'draw' && district ? (
-          <DrawPanel
-            districtName={district.name}
-            points={drawing.points}
-            preview={drawing.preview}
-            onUndo={drawing.undo}
-            onCancel={leaveDrawing}
-            onSaved={(route) => handleRouteSaved(route, view.districtId)}
-          />
-        ) : view.mode === 'result' && district ? (
-          <ResultPanel
-            data={view.data}
-            metrics={city.metrics}
-            districtName={district.name}
-            onEdit={() => setView({ mode: 'district', districtId: view.districtId })}
-            onClose={() => setView({ mode: 'explore' })}
-          />
-        ) : view.mode === 'district' && district && draft ? (
-          <DistrictPanel
-            key={district.id}
-            district={district}
-            metrics={city.metrics}
-            actions={actions}
-            routes={routes}
-            draft={draft}
-            onToggle={toggle}
-            onChooseRoute={(routeId) => setDraft((current) => current && chooseRoute(current, routeId))}
-            onClose={() => setView({ mode: 'explore' })}
-            onDrawRoute={startDrawing}
-          />
-        ) : (
-          <CityKpiPanel metrics={city.metrics} city={city.city} />
-        )}
+        {sidePanel ?? kpi}
       </FloatingPanel>
-      {view.mode === 'district' && draft && (
-        <div className={styles.bottom}>
-          <ScenarioTray
-            key={draft.districtId}
-            draft={draft}
-            actions={actions}
-            routes={routes}
-            budget={DEFAULT_BUDGET}
-            onRemove={toggle}
-            onSimulated={(data) => {
-              setView((current) => afterSimulation(current, draft.districtId, data))
-              setScenariosVersion((v) => v + 1)
-            }}
-          />
-        </div>
-      )}
-      {view.mode !== 'district' && view.mode !== 'draw' && (
-        <div className={styles.bottom}>
-          <AiBar onResult={(data) => { setView((current) => afterAiPlan(current, data)); setScenariosVersion((v) => v + 1) }} />
-        </div>
-      )}
-      {view.mode === 'ai' && (
-        <div className={styles.overlay}>
-          <AiResults data={view.data} metrics={city.metrics} onClose={() => setView({ mode: 'explore' })} />
-        </div>
-      )}
+      {tray && <div className={styles.bottom}>{tray}</div>}
+      {view.mode !== 'district' && view.mode !== 'draw' && <div className={styles.bottom}>{aiBar}</div>}
+      {aiResults && <div className={styles.overlay}>{aiResults}</div>}
       {view.mode !== 'draw' && <FloatingPanel className={styles.bottomLeft} title="Легенда"><Legend metric={metric} /></FloatingPanel>}
     </div>
   )

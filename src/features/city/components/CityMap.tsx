@@ -7,6 +7,7 @@ import {
   busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
   labelCollection, lineCollection, numberedStops, routeCollection, stopCollection, type RouteLayer,
 } from '../geo'
+import { snapHeight, type Snap } from '../sheet'
 import styles from './CityMap.module.css'
 
 // MapLibre 6 ищет воркер рядом с собой через import.meta.url,
@@ -31,6 +32,7 @@ type CityMapProps = {
   onSelectDistrict: (id: number) => void
   drawing: { points: LatLng[]; path: [number, number][] | null } | null
   onMapClick: (point: LatLng) => void
+  sheetSnap?: Snap // на телефоне: карта центрирует выбранное над шторкой
 }
 
 function cssVar(name: string): string {
@@ -96,7 +98,7 @@ function addLayers(map: MapLibreMap) {
 }
 
 export function CityMap(props: CityMapProps) {
-  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick } = props
+  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick, sheetSnap } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   // Обработчики регистрируются один раз при загрузке карты — берём из ref последние версии
@@ -158,9 +160,12 @@ export function CityMap(props: CityMapProps) {
   useEffect(() => {
     if (!map) return
     const selected = districts.find((d) => d.id === selectedId)
-    if (selected) map.flyTo({ center: [selected.center.lng, selected.center.lat], zoom: 14.6, pitch: 60 })
-    else map.easeTo({ center: AKTAU_CENTER, zoom: 13.2, pitch: 55 })
-  }, [map, districts, selectedId])
+    // Шторка «во весь экран» закрывает карту — центрируем как для половины
+    const bottom = sheetSnap ? snapHeight(sheetSnap === 'full' ? 'half' : sheetSnap, map.getContainer().clientHeight) : 0
+    const padding = { top: 0, right: 0, left: 0, bottom }
+    if (selected) map.flyTo({ center: [selected.center.lng, selected.center.lat], zoom: sheetSnap ? 14 : 14.6, pitch: 60, padding })
+    else map.easeTo({ center: AKTAU_CENTER, zoom: 13.2, pitch: 55, padding })
+  }, [map, districts, selectedId, sheetSnap])
 
   useEffect(() => {
     if (!map) return

@@ -152,3 +152,51 @@
     grid-template-columns: minmax(0, 1fr) 26rem;
   }
 }
+
+.names {
+  display: none;
+}
+
+@media (max-width: 63.99rem) {
+  .names {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .names li {
+    padding: 0.625rem 0.875rem;
+    border-left: 4px solid transparent;
+    border-radius: 0.75rem;
+    background: var(--surface);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .names li.colA { border-left-color: var(--accent); }
+  .names li.colB { border-left-color: var(--route); }
+  .names li.colC { border-left-color: var(--mid); }
+
+  .table thead th .thName {
+    display: none;
+  }
+
+  .tableWrap {
+    padding: 0.5rem;
+  }
+
+  .table {
+    font-size: 0.8125rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .table td {
+    white-space: nowrap;
+  }
+}

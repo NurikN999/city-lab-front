@@ -15,6 +15,14 @@ function CompareView({ data, metrics, districtName }: { data: CompareResponse; m
       </header>
 
       <div className={styles.grid}>
+        {/* На телефоне длинные названия уходят из шапки таблицы сюда */}
+        <ol className={styles.names} aria-label="Сценарии">
+          {data.scenarios.map((s) => (
+            <li key={s.scenario.id} className={styles[`col${s.label}`]}>
+              <span className={styles.letter}>{s.label}</span> {s.scenario.name.replace(/^[ABC] · /, '')}
+            </li>
+          ))}
+        </ol>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
@@ -23,7 +31,7 @@ function CompareView({ data, metrics, districtName }: { data: CompareResponse; m
                 {data.scenarios.map((s) => (
                   <th key={s.scenario.id} scope="col" className={styles[`col${s.label}`]}>
                     <span className={styles.letter}>{s.label}</span>
-                    <span>{s.scenario.name.replace(/^[ABC] · /, '')}</span>
+                    <span className={styles.thName}>{s.scenario.name.replace(/^[ABC] · /, '')}</span>
                   </th>
                 ))}
               </tr>
