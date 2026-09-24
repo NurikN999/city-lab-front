@@ -28,6 +28,12 @@
   gap: 0.75rem;
 }
 
+.drawing {
+  /* На узком экране панель рисования внизу — сверху остаётся карта для кликов */
+  align-content: end;
+  padding-bottom: 3.5rem; /* не под подписью карты */
+}
+
 .status {
   margin: 2rem auto;
   color: var(--muted);

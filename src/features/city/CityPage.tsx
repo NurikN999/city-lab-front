@@ -94,7 +94,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const routesOnMap: RouteLayer[] = resultRoute ? [{ route: resultRoute, emphasis: 'selected' }] : mapRoutes
 
   return (
-    <div className={styles.screen}>
+    <div className={`${styles.screen} ${view.mode === 'draw' ? styles.drawing : ''}`}>
       <CityMap
         districts={city.districts}
         metric={metric}
@@ -108,11 +108,14 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.path } : null}
         onMapClick={handleMapClick}
       />
-      <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>
-      <div className={`${styles.left} ${styles.stack}`}>
-        <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
-        <MyScenarios reloadKey={scenariosVersion} />
-      </div>
+      {view.mode !== 'draw' && <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
+      {view.mode !== 'draw' && (
+        // Во время рисования список районов скрыт: выбор другого района стёр бы точки
+        <div className={`${styles.left} ${styles.stack}`}>
+          <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
+          <MyScenarios reloadKey={scenariosVersion} />
+        </div>
+      )}
       <div className={styles.right}>
         {view.mode === 'draw' && district ? (
           <DrawPanel
@@ -174,7 +177,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
           <AiResults data={view.data} metrics={city.metrics} onClose={() => setView({ mode: 'explore' })} />
         </div>
       )}
-      <div className={styles.bottomLeft}><Legend metric={metric} /></div>
+      {view.mode !== 'draw' && <div className={styles.bottomLeft}><Legend metric={metric} /></div>}
     </div>
   )
 }
