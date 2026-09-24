@@ -66,6 +66,8 @@
 
 .chips {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.25rem;
   padding: 0.25rem;
   background: var(--surface);
