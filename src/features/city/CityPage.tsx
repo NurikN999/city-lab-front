@@ -7,6 +7,7 @@ import { CityKpiPanel } from './components/CityKpiPanel'
 import { CityMap } from './components/CityMap'
 import { DistrictPanel } from './components/DistrictPanel'
 import { DrawPanel } from './components/DrawPanel'
+import { FloatingPanel } from './components/FloatingPanel'
 import { Legend } from './components/Legend'
 import { LayerSwitch } from './components/LayerSwitch'
 import { MyScenarios } from './components/MyScenarios'
@@ -91,6 +92,10 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const resultRouteId = isResult ? (view.data.scenario.items.find((i) => i.route_id !== null)?.route_id ?? null) : null
   const resultRoute = routes.find((r) => r.id === resultRouteId)
   const coverageStops: LatLng[] = resultRoute ? resultRoute.stops.map(({ lat, lng }) => ({ lat, lng })) : []
+  const rightTitle = view.mode === 'draw' ? 'Новый маршрут'
+    : view.mode === 'result' ? 'До → После'
+    : view.mode === 'district' && district ? district.name
+    : 'Актау сейчас'
   const routesOnMap: RouteLayer[] = resultRoute ? [{ route: resultRoute, emphasis: 'selected' }] : mapRoutes
 
   return (
@@ -111,12 +116,14 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       {view.mode !== 'draw' && <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
       {view.mode !== 'draw' && (
         // Во время рисования список районов скрыт: выбор другого района стёр бы точки
-        <div className={`${styles.left} ${styles.stack}`}>
-          <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
-          <MyScenarios reloadKey={scenariosVersion} />
-        </div>
+        <FloatingPanel className={styles.left} title="Проблемы города">
+          <div className={styles.stack}>
+            <ProblemsPanel districts={city.districts} values={baseValues} metric={metric} onSelect={selectDistrict} />
+            <MyScenarios reloadKey={scenariosVersion} />
+          </div>
+        </FloatingPanel>
       )}
-      <div className={styles.right}>
+      <FloatingPanel className={styles.right} title={rightTitle}>
         {view.mode === 'draw' && district ? (
           <DrawPanel
             districtName={district.name}
@@ -150,7 +157,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         ) : (
           <CityKpiPanel metrics={city.metrics} city={city.city} />
         )}
-      </div>
+      </FloatingPanel>
       {view.mode === 'district' && draft && (
         <div className={styles.bottom}>
           <ScenarioTray
@@ -177,7 +184,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
           <AiResults data={view.data} metrics={city.metrics} onClose={() => setView({ mode: 'explore' })} />
         </div>
       )}
-      {view.mode !== 'draw' && <div className={styles.bottomLeft}><Legend metric={metric} /></div>}
+      {view.mode !== 'draw' && <FloatingPanel className={styles.bottomLeft} title="Легенда"><Legend metric={metric} /></FloatingPanel>}
     </div>
   )
 }

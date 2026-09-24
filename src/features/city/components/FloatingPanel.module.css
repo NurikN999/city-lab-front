@@ -1,0 +1,71 @@
+.floating {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+}
+
+.dragging {
+  z-index: 3;
+  user-select: none;
+}
+
+.bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.floating.collapsed {
+  width: auto;
+}
+
+.collapsed .bar {
+  justify-content: flex-start;
+}
+
+.name {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-family: var(--display);
+  font-size: 0.8125rem;
+}
+
+.grip,
+.toggle {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.grip {
+  display: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.dragging .grip {
+  cursor: grabbing;
+}
+
+.grip:hover,
+.toggle:hover {
+  color: var(--text);
+}
+
+@media (min-width: 64rem) {
+  .grip {
+    display: grid;
+  }
+}
