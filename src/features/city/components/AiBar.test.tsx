@@ -12,6 +12,7 @@ describe('AiBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Спросить' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось определить район')
+    expect(screen.getByLabelText('City AI')).toHaveValue('пробки в городе')
   })
 
   it('passes the plan to the parent', async () => {

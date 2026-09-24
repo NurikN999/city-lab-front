@@ -39,4 +39,16 @@ describe('ActionRow', () => {
 
     await vi.waitFor(() => expect(onUnauthorized).toHaveBeenCalled())
   })
+  it('keeps edited values when the server rejects them', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'Ошибка', errors: { 'effects.0.delta_pct': ['Слишком большое значение.'] } }), { status: 422 })))
+    render(<table><tbody><ActionRow action={lights} token="t" onSaved={vi.fn()} onUnauthorized={vi.fn()} /></tbody></table>)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Изменить «Умные светофоры»' }))
+    await userEvent.clear(screen.getByLabelText('Стоимость, млн ₸'))
+    await userEvent.type(screen.getByLabelText('Стоимость, млн ₸'), '15')
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Слишком большое значение.')
+    expect(screen.getByLabelText('Стоимость, млн ₸')).toHaveValue(15)
+  })
 })

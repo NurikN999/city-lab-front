@@ -1,14 +1,15 @@
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { ApiError } from '../../../shared/lib/api'
 import type { AiPlanResponse } from '../../../shared/lib/schemas'
 import { planWithAi } from '../api'
 import styles from './Panels.module.css'
 
 export function AiBar({ onResult }: { onResult: (data: AiPlanResponse) => void }) {
+  // Контролируемое поле: React 19 после action сбрасывает только неконтролируемые — запрос не пропадёт при ошибке
+  const [prompt, setPrompt] = useState('')
   const [error, ask, isPending] = useActionState(async (_: string | null, form: FormData) => {
-    const prompt = String(form.get('prompt') ?? '').trim()
     try {
-      onResult(await planWithAi(prompt))
+      onResult(await planWithAi(String(form.get('prompt') ?? '').trim()))
       return null
     } catch (e) {
       return e instanceof ApiError ? e.message : 'City AI сейчас недоступен.'
@@ -21,6 +22,8 @@ export function AiBar({ onResult }: { onResult: (data: AiPlanResponse) => void }
       <input
         id="ai-prompt"
         name="prompt"
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
         required
         minLength={5}
         maxLength={500}

@@ -1,10 +1,12 @@
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { ApiError } from '../../shared/lib/api'
 import { login } from './api'
 import styles from './ModelPage.module.css'
 import { saveToken } from './session'
 
 export function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
+  // email контролируемый — после неудачного входа он остаётся, пароль сбрасывается
+  const [email, setEmail] = useState('')
   const [error, submit, isPending] = useActionState(async (_: string | null, form: FormData) => {
     try {
       const { token } = await login(String(form.get('email') ?? ''), String(form.get('password') ?? ''))
@@ -22,7 +24,7 @@ export function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
       <p className={styles.hint}>Редактирование коэффициентов и стоимостей модели.</p>
       <label className={styles.field}>
         Email
-        <input name="email" type="email" autoComplete="username" required />
+        <input name="email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />
       </label>
       <label className={styles.field}>
         Пароль

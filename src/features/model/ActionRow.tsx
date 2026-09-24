@@ -1,4 +1,4 @@
-import { useActionState, useState } from 'react'
+import { useActionState, useState, type ChangeEvent } from 'react'
 import { ApiError } from '../../shared/lib/api'
 import { formatMoney } from '../../shared/lib/format'
 import type { Action } from '../../shared/lib/schemas'
@@ -9,6 +9,20 @@ type ActionRowProps = { action: Action; token: string; onSaved: () => void; onUn
 
 export function ActionRow({ action, token, onSaved, onUnauthorized }: ActionRowProps) {
   const [isEditing, setIsEditing] = useState(false)
+  // Контролируемые поля: при ошибке сервера правки не откатываются к старым значениям
+  const [fields, setFields] = useState<Record<string, string>>({})
+
+  function startEditing() {
+    setFields(Object.fromEntries([
+      ['cost', String(action.cost / 1_000_000)],
+      ...action.effects.flatMap((effect, i) => [[`delta-${i}`, String(effect.delta_pct)], [`spill-${i}`, String(effect.spill)]]),
+    ]))
+    setIsEditing(true)
+  }
+
+  function field(name: string) {
+    return { name, value: fields[name] ?? '', onChange: (event: ChangeEvent<HTMLInputElement>) => setFields((f) => ({ ...f, [name]: event.target.value })) }
+  }
 
   const [error, save, isPending] = useActionState(async (_: string | null, form: FormData) => {
     const body = {
@@ -41,7 +55,7 @@ export function ActionRow({ action, token, onSaved, onUnauthorized }: ActionRowP
         <td>{formatMoney(action.cost)}</td>
         <td>{action.effects.length === 0 ? 'Покрытие ОТ — расчёт по остановкам' : action.effects.map((e) => `${e.metric} ${e.delta_pct > 0 ? '+' : ''}${e.delta_pct}%`).join(' · ')}</td>
         <td>
-          <button type="button" className={styles.secondary} aria-label={`Изменить «${action.name}»`} onClick={() => setIsEditing(true)}>Изменить</button>
+          <button type="button" className={styles.secondary} aria-label={`Изменить «${action.name}»`} onClick={startEditing}>Изменить</button>
         </td>
       </tr>
     )
@@ -54,18 +68,18 @@ export function ActionRow({ action, token, onSaved, onUnauthorized }: ActionRowP
         <form action={save} className={styles.editForm}>
           <label className={styles.field}>
             Стоимость, млн ₸
-            <input name="cost" type="number" min={0} step={1} defaultValue={action.cost / 1_000_000} required />
+            <input {...field('cost')} type="number" min={0} step={1} required />
           </label>
           {action.effects.map((effect, i) => (
             <fieldset key={effect.metric} className={styles.effect}>
               <legend>{effect.metric}</legend>
               <label className={styles.field}>
                 {effect.metric}, %
-                <input name={`delta-${i}`} type="number" min={-100} max={100} step={0.5} defaultValue={effect.delta_pct} required />
+                <input {...field(`delta-${i}`)} type="number" min={-100} max={100} step={0.5} required />
               </label>
               <label className={styles.field}>
                 Соседям
-                <input name={`spill-${i}`} type="number" min={0} max={1} step={0.1} defaultValue={effect.spill} required />
+                <input {...field(`spill-${i}`)} type="number" min={0} max={1} step={0.1} required />
               </label>
             </fieldset>
           ))}
