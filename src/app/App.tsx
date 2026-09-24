@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import styles from './App.module.css'
+import { ErrorBoundary } from './ErrorBoundary'
 import { Header } from './Header'
 import { useHashRoute } from './useHashRoute'
 
@@ -14,11 +15,13 @@ export function App() {
     <div className={styles.shell}>
       <Header page={route.page} />
       <main className={styles.main}>
-        <Suspense fallback={<p className={styles.status}>Загрузка…</p>}>
-          {route.page === 'city' && <CityPage />}
-          {route.page === 'compare' && <ComparePage ids={route.ids} />}
-          {route.page === 'model' && <ModelPage />}
-        </Suspense>
+        <ErrorBoundary key={route.page}>
+          <Suspense fallback={<p className={styles.status}>Загрузка…</p>}>
+            {route.page === 'city' && <CityPage />}
+            {route.page === 'compare' && <ComparePage ids={route.ids} />}
+            {route.page === 'model' && <ModelPage />}
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   )

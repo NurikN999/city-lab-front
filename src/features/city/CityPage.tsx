@@ -143,6 +143,6 @@ export default function CityPage() {
 
   if (data.status === 'loading') return <p className={styles.status}>Загружаем город…</p>
   if (data.status === 'error') return <p className={styles.status} role="alert">Не удалось загрузить город: {data.error}</p>
-  if (data.data.city.districts.length === 0) return <p className={styles.status}>В базе нет районов — выполните сидер бэкенда.</p>
+  if (data.data.city.districts.length === 0 || data.data.city.metrics.length === 0) return <p className={styles.status}>В базе нет районов или метрик — выполните сидер бэкенда.</p>
   return <CityScreen city={data.data.city} actions={data.data.actions} routes={data.data.routes} />
 }

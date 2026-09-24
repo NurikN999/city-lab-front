@@ -5,6 +5,7 @@ import { afterEach, vi } from 'vitest'
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   sessionStorage.clear()
   window.location.hash = ''
 })
