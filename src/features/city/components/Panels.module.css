@@ -470,3 +470,44 @@
   background: var(--surface);
   color: var(--text);
 }
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.field input {
+  min-height: 2.5rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  color: var(--text);
+}
+
+.primaryButton {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  background: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.drawButton {
+  min-height: 2.75rem;
+  border: 1px dashed var(--route);
+  border-radius: 0.75rem;
+  background: var(--route-soft);
+  color: var(--route);
+  font-weight: 600;
+  cursor: pointer;
+}

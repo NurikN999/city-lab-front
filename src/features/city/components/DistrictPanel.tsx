@@ -12,10 +12,11 @@ type DistrictPanelProps = {
   onToggle: (action: Action) => void
   onChooseRoute: (routeId: number) => void
   onClose: () => void
+  onDrawRoute: () => void
 }
 
-export function DistrictPanel({ district, metrics, actions, routes, draft, onToggle, onChooseRoute, onClose }: DistrictPanelProps) {
-  const servingRoutes = routes.filter((r) => r.district_ids.includes(district.id))
+export function DistrictPanel({ district, metrics, actions, routes, draft, onToggle, onChooseRoute, onClose, onDrawRoute }: DistrictPanelProps) {
+  const servingRoutes = routes.filter((r) => r.district_ids.includes(district.id) || r.id === draft.routeId)
   const available = actions.filter((a) => a.scope === 'district' || servingRoutes.length > 0)
   const routeActionOn = actions.some((a) => a.scope === 'route' && draft.actionIds.includes(a.id))
 
@@ -60,6 +61,7 @@ export function DistrictPanel({ district, metrics, actions, routes, draft, onTog
           )
         })}
       </ul>
+      <button type="button" className={styles.drawButton} onClick={onDrawRoute}>Нарисовать свой маршрут</button>
 
       {routeActionOn && (
         <fieldset className={styles.routes}>
