@@ -15,7 +15,7 @@ type DrawPanelProps = {
 }
 
 export function DrawPanel({ districtName, points, preview, onUndo, onCancel, onSaved }: DrawPanelProps) {
-  const [name, setName] = useState(`Маршрут · ${districtName}`)
+  const [name, setName] = useState(`Маршрут · ${districtName}`.slice(0, 60).trim())
 
   const [error, save, isPending] = useActionState(async () => {
     try {
@@ -41,12 +41,14 @@ export function DrawPanel({ districtName, points, preview, onUndo, onCancel, onS
           <dd>{preview.status === 'ready' ? `${pathLengthKm(preview.data.path.coordinates).toFixed(1)} км` : '—'}</dd>
         </div>
       </dl>
-      {points.length >= MAX_POINTS && <p className={styles.hint}>Максимум {MAX_POINTS} остановок.</p>}
-      {preview.status === 'loading' && <p className={styles.hint}>Строим путь по дорогам…</p>}
-      {preview.status === 'ready' && !preview.data.snapped && (
-        <p className={styles.error}>Линия прямая — роутинг по дорогам сейчас недоступен.</p>
-      )}
-      {preview.status === 'error' && <p className={styles.error}>{preview.error}</p>}
+      <div role="status" aria-live="polite">
+        {points.length >= MAX_POINTS && <p className={styles.hint}>Максимум {MAX_POINTS} остановок.</p>}
+        {preview.status === 'loading' && <p className={styles.hint}>Строим путь по дорогам…</p>}
+        {preview.status === 'ready' && !preview.data.snapped && (
+          <p className={styles.error}>Линия прямая — роутинг по дорогам сейчас недоступен.</p>
+        )}
+        {preview.status === 'error' && <p className={styles.error}>{preview.error}</p>}
+      </div>
 
       <label className={styles.field}>
         Название

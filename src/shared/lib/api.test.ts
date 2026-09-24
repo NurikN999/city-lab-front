@@ -48,4 +48,14 @@ describe('request', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ message: 'Сервер вернул данные в неожиданном формате.' })
   })
+
+  it('passes a cancellation through instead of reporting a bad response', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: () => Promise.reject(new DOMException('aborted', 'AbortError')) })))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(request('/x', z.object({}), { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(consoleError).not.toHaveBeenCalled()
+  })
 })

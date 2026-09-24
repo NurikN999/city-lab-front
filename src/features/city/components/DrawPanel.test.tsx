@@ -46,4 +46,17 @@ describe('DrawPanel', () => {
 
     expect(screen.getByText('Максимум 25 остановок.')).toBeInTheDocument()
   })
+
+  it('keeps the default name within the 60-character limit', () => {
+    const longName = 'Очень длинное название района '.repeat(3)
+    render(<DrawPanel districtName={longName} points={two} preview={{ status: 'idle' }} onUndo={vi.fn()} onCancel={vi.fn()} onSaved={vi.fn()} />)
+
+    expect(screen.getByLabelText('Название')).toHaveValue(`Маршрут · ${longName}`.slice(0, 60).trim())
+  })
+
+  it('announces the preview status', () => {
+    render(<DrawPanel districtName="12 мкр" points={two} preview={{ status: 'loading' }} onUndo={vi.fn()} onCancel={vi.fn()} onSaved={vi.fn()} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Строим путь по дорогам…')
+  })
 })

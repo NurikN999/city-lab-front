@@ -105,7 +105,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         coverageStops={coverageStops}
         animateBuses={isResult}
         onSelectDistrict={selectDistrict}
-        drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.preview.status === 'ready' ? drawing.preview.data.path.coordinates : null } : null}
+        drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.path } : null}
         onMapClick={handleMapClick}
       />
       <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>

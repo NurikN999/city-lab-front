@@ -50,4 +50,19 @@ describe('useRouteDrawing', () => {
     expect(result.current.points).toHaveLength(MAX_POINTS)
     expect(fetch).toHaveBeenCalledTimes(calls)
   })
+
+  it('keeps the last road line while the next preview loads', async () => {
+    const { answer } = stubPendingFetch()
+    const { result } = renderHook(() => useRouteDrawing())
+
+    act(() => result.current.add(p(0)))
+    act(() => result.current.add(p(1)))
+    await act(async () => answer(0))
+    act(() => result.current.add(p(2)))
+
+    expect(result.current.preview.status).toBe('loading')
+    expect(result.current.path).toEqual(previewBody.path.coordinates)
+    act(() => result.current.reset())
+    expect(result.current.path).toBeNull()
+  })
 })

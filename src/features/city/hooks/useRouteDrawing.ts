@@ -7,6 +7,8 @@ import { addPoint, MAX_POINTS, undoPoint, type PreviewState } from '../drawing'
 export function useRouteDrawing() {
   const [points, setPoints] = useState<LatLng[]>([])
   const [preview, setPreview] = useState<PreviewState>({ status: 'idle' })
+  // Последняя готовая линия остаётся на карте, пока строится следующая — без мигания
+  const [path, setPath] = useState<[number, number][] | null>(null)
   const request = useRef<AbortController | null>(null)
 
   function show(next: LatLng[]) {
@@ -14,6 +16,7 @@ export function useRouteDrawing() {
     setPoints(next)
     if (next.length < 2) {
       setPreview({ status: 'idle' })
+      setPath(null)
       return
     }
     const controller = new AbortController()
@@ -21,7 +24,9 @@ export function useRouteDrawing() {
     setPreview({ status: 'loading' })
     previewRoute(next, controller.signal)
       .then((data) => {
-        if (!controller.signal.aborted) setPreview({ status: 'ready', data })
+        if (controller.signal.aborted) return
+        setPreview({ status: 'ready', data })
+        setPath(data.path.coordinates)
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setPreview({ status: 'error', error: error instanceof Error ? error.message : String(error) })
@@ -31,6 +36,7 @@ export function useRouteDrawing() {
   return {
     points,
     preview,
+    path,
     add: (point: LatLng) => {
       if (points.length < MAX_POINTS) show(addPoint(points, point))
     },

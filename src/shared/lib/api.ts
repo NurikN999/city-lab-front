@@ -44,7 +44,10 @@ export async function request<T>(path: string, schema: z.ZodType<T>, options: Re
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     signal: options.signal,
   })
-  const body: unknown = await response.json().catch(() => null)
+  const body: unknown = await response.json().catch((error: unknown) => {
+    if (options.signal?.aborted) throw error
+    return null
+  })
 
   if (!response.ok) throw new ApiError(response.status, errorMessage(response.status, body), body)
 
