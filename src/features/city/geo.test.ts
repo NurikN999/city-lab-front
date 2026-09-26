@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Metric } from '../../shared/lib/schemas'
-import { alertCollections, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
+import { alertCollections, buildZoneCollection, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
 
 const traffic: Metric = { key: 'traffic', name: 'Загрузка дорог', unit: '%', sphere: 'transport', lower_is_better: true, min: 0, max: 100, is_computed: false }
 
@@ -104,5 +104,14 @@ describe('geo', () => {
     expect(areas.features[0].geometry).toEqual(district.boundary)
     expect(points.features[0].properties).toEqual({ id: 11, count: 3, label: '3' })
     expect(points.features[0].geometry.coordinates).toEqual([district.center.lng, district.center.lat])
+  })
+
+  it('draws an influence circle for each placed object', () => {
+    const fc = buildZoneCollection([{ uid: 1, lat: 43.66, lng: 51.16, radiusM: 500, invalid: true }])
+
+    expect(fc.features[0].properties).toEqual({ uid: 1, invalid: true })
+    const ring = fc.features[0].geometry.coordinates[0]
+    expect(metersBetween(ring[0], [51.16, 43.66])).toBeGreaterThan(480)
+    expect(metersBetween(ring[0], [51.16, 43.66])).toBeLessThan(520)
   })
 })

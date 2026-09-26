@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
 import type { Action, BusRoute, CityResponse, LatLng, MetricValues } from '../../shared/lib/schemas'
+import { createScenario } from './api'
+import { buildItems, districtAt, placementProblems, type Placement } from './build'
 import { AiBar } from './components/AiBar'
 import { AiResults } from './components/AiResults'
 import { CityKpiPanel } from './components/CityKpiPanel'
@@ -23,6 +25,8 @@ import { alertsByDistrict } from '../complaints/feed'
 import { useComplaintFeed } from '../complaints/useComplaintFeed'
 import { readToken } from '../model/session'
 import { BottomSheet } from './components/BottomSheet'
+import { BuildPanel } from './components/BuildPanel'
+import { useBuildPreview } from './hooks/useBuildPreview'
 import { useCityData } from './hooks/useCityData'
 import { useRouteDrawing } from './hooks/useRouteDrawing'
 import { LAYERS, type LayerSphere } from './layers'
@@ -35,7 +39,7 @@ import { afterAiPlan, afterSimulation, type View } from './view'
 
 
 const MOBILE = '(max-width: 63.99rem)'
-const DEFAULT_SNAP: Record<View['mode'], Snap> = { explore: 'peek', district: 'half', result: 'half', ai: 'full', draw: 'peek' }
+const DEFAULT_SNAP: Record<View['mode'], Snap> = { explore: 'peek', district: 'half', result: 'half', ai: 'full', draw: 'peek', build: 'half' }
 type ExploreTab = 'problems' | 'mine' | 'city'
 const EXPLORE_TABS: [ExploreTab, string][] = [['problems', 'Проблемы'], ['mine', 'Сценарии'], ['city', 'Город']]
 
@@ -47,6 +51,13 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const isMobile = useMediaQuery(MOBILE)
   const feed = useComplaintFeed()
   const alerts = useMemo(() => alertsByDistrict(feed.complaints), [feed.complaints])
+  // Конструктор: объекты на карте, выбранный инструмент палитры и живой пересчёт
+  const [placements, setPlacements] = useState<Placement[]>([])
+  const [tool, setTool] = useState<number | null>(null)
+  const nextUid = useRef(1)
+  const objects = actions.filter((a) => a.scope === 'point')
+  const placeProblems = useMemo(() => placementProblems(placements, city.districts), [placements, city.districts])
+  const preview = useBuildPreview(view.mode === 'build' ? buildItems(placements) : [])
   const [tab, setTab] = useState<ExploreTab>('problems')
   // Положение шторки задаёт режим; ручная правка действует, пока режим не сменился
   const [sheet, setSheet] = useState<{ mode: View['mode']; snap: Snap }>({ mode: 'explore', snap: 'peek' })
@@ -63,7 +74,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const layer = LAYERS.find((l) => l.sphere === sphere) ?? LAYERS[0]
   const metric = city.metrics.find((m) => m.key === layer.metric) ?? city.metrics[0]
   const baseValues = valuesById(city.districts)
-  const selectedId = view.mode === 'explore' || view.mode === 'ai' ? null : view.districtId
+  const selectedId = view.mode === 'explore' || view.mode === 'ai' || view.mode === 'build' ? null : view.districtId
   const district = city.districts.find((d) => d.id === selectedId)
 
   function selectDistrict(id: number) {
@@ -86,7 +97,11 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     setView({ mode: 'draw', districtId: draft.districtId })
   }
 
-  function handleMapClick(point: LatLng) {
+  function handleMapClick(point: LatLng, onBuilding: boolean) {
+    if (view.mode === 'build' && tool !== null) {
+      const uid = nextUid.current++
+      setPlacements((current) => [...current, { uid, actionId: tool, ...point, onBuilding }])
+    }
     if (view.mode === 'draw') drawing.add(point)
   }
 
@@ -109,15 +124,38 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     : []
 
   const isResult = view.mode === 'result'
-  const shownValues: Record<string, MetricValues> = isResult ? view.data.result.after.districts : baseValues
-  const ghostValues = isResult ? view.data.result.before.districts : null
-  const mapValues = useTweenedValues(ghostValues, shownValues)
+  const buildResult = view.mode === 'build' ? preview.result : null
+  const shownValues: Record<string, MetricValues> = isResult ? view.data.result.after.districts : buildResult ? buildResult.after.districts : baseValues
+  const ghostValues = isResult ? view.data.result.before.districts : buildResult ? buildResult.before.districts : null
+  // Анимация «до → после» — только для SIMULATE: в конструкторе значения меняются на ходу
+  const mapValues = useTweenedValues(isResult ? ghostValues : null, shownValues)
+
+  function leaveBuild() {
+    setPlacements([])
+    setTool(null)
+    setView({ mode: 'explore' })
+  }
+
+  async function saveBuild(name: string) {
+    const home = placements[0] && districtAt(city.districts, placements[0])
+    if (!home) return
+    const data = await createScenario({ name, district_id: home.id, items: buildItems(placements) })
+    setScenariosVersion((v) => v + 1)
+    setPlacements([])
+    setTool(null)
+    setView({ mode: 'result', districtId: home.id, data })
+  }
+
+  const buildButton = view.mode !== 'build' && view.mode !== 'draw' && (
+    <button type="button" className={styles.buildButton} onClick={() => setView({ mode: 'build' })}>Конструктор</button>
+  )
   const resultRouteId = isResult ? (view.data.scenario.items.find((i) => i.route_id !== null)?.route_id ?? null) : null
   const resultRoute = routes.find((r) => r.id === resultRouteId)
   const coverageStops: LatLng[] = resultRoute ? resultRoute.stops.map(({ lat, lng }) => ({ lat, lng })) : []
   const rightTitle = view.mode === 'draw' ? 'Новый маршрут'
     : view.mode === 'result' ? 'До → После'
     : view.mode === 'ai' ? 'City AI'
+    : view.mode === 'build' ? 'Конструктор'
     : view.mode === 'district' && district ? district.name
     : 'Актау сейчас'
   const routesOnMap: RouteLayer[] = resultRoute ? [{ route: resultRoute, emphasis: 'selected' }] : mapRoutes
@@ -127,7 +165,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const moderate = token
     ? (id: number, status: 'resolved' | 'hidden') => { setComplaintStatus(id, status, token).then(feed.refresh).catch(() => {}) }
     : null
-  const toasts = view.mode !== 'draw' && (
+  const toasts = view.mode !== 'draw' && view.mode !== 'build' && (
     <ComplaintToasts
       items={feed.fresh}
       districtName={(id) => city.districts.find((d) => d.id === id)?.name ?? 'район'}
@@ -151,10 +189,33 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       onMapClick={handleMapClick}
       sheetSnap={isMobile ? snap : undefined}
       alerts={alerts}
+      building={view.mode === 'build' ? {
+        markers: placements.map((p) => {
+          const object = objects.find((o) => o.id === p.actionId)
+          const name = object?.name ?? 'Объект'
+          return { uid: p.uid, lat: p.lat, lng: p.lng, radiusM: object?.radius_m ?? 0, label: name.charAt(0), name, invalid: placeProblems.has(p.uid) }
+        }),
+        onMove: (uid, point, onBuilding) => setPlacements((current) => current.map((p) => (p.uid === uid ? { ...p, ...point, onBuilding } : p))),
+      } : null}
     />
   )
 
-  const sidePanel = view.mode === 'draw' && district ? (
+  const sidePanel = view.mode === 'build' ? (
+    <BuildPanel
+      objects={objects}
+      metrics={city.metrics}
+      districts={city.districts}
+      placements={placements}
+      problems={placeProblems}
+      tool={tool}
+      result={preview.result}
+      error={preview.error}
+      onTool={setTool}
+      onRemove={(uid) => setPlacements((current) => current.filter((p) => p.uid !== uid))}
+      onSave={saveBuild}
+      onExit={leaveBuild}
+    />
+  ) : view.mode === 'draw' && district ? (
     <DrawPanel
       districtName={district.name}
       points={drawing.points}
@@ -220,6 +281,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
           {aiResults ?? sidePanel ?? (
             <div className={styles.explore}>
               {aiBar}
+              {buildButton}
               <div role="tablist" aria-label="Разделы города" className={styles.tabs}>
                 {EXPLORE_TABS.map(([key, label]) => (
                   <button key={key} type="button" role="tab" aria-selected={tab === key} className={styles.tab} onClick={() => { setTab(key); setSheet({ mode: view.mode, snap: 'half' }) }}>
@@ -239,7 +301,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     <div className={`${styles.screen} ${view.mode === 'draw' ? styles.drawing : ''}`}>
       {map}
       {toasts}
-      {view.mode !== 'draw' && <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
+      {view.mode !== 'draw' && <div className={`${styles.top} ${styles.topRow}`}><LayerSwitch active={sphere} onChange={setSphere} />{buildButton}</div>}
       {view.mode !== 'draw' && (
         // Во время рисования список районов скрыт: выбор другого района стёр бы точки
         <FloatingPanel className={styles.left} title="Проблемы города">
@@ -253,7 +315,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         {sidePanel ?? kpi}
       </FloatingPanel>
       {tray && <div className={styles.bottom}>{tray}</div>}
-      {view.mode !== 'district' && view.mode !== 'draw' && <div className={styles.bottom}>{aiBar}</div>}
+      {view.mode !== 'district' && view.mode !== 'draw' && view.mode !== 'build' && <div className={styles.bottom}>{aiBar}</div>}
       {aiResults && <div className={styles.overlay}>{aiResults}</div>}
       {view.mode !== 'draw' && <FloatingPanel className={styles.bottomLeft} title="Легенда"><Legend metric={metric} /></FloatingPanel>}
     </div>

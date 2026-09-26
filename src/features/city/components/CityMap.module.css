@@ -2,3 +2,22 @@
   position: absolute;
   inset: 0;
 }
+
+/* Значок объекта конструктора — его можно тащить */
+.buildMarker {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--route);
+  color: var(--surface);
+  font-weight: 700;
+  box-shadow: var(--shadow);
+  cursor: grab;
+}
+
+.buildMarkerInvalid {
+  background: var(--bad);
+}

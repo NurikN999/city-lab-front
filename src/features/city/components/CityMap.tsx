@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource } from 'maplibre-gl'
+import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type LngLat } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { District, LatLng, Metric, MetricValues } from '../../../shared/lib/schemas'
 import {
-  alertCollections, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
+  alertCollections, buildZoneCollection, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
   labelCollection, lineCollection, numberedStops, routeCollection, type DistrictAlert, stopCollection, type RouteLayer,
 } from '../geo'
 import { snapHeight, type Snap } from '../sheet'
@@ -34,9 +34,18 @@ type CityMapProps = {
   animateBuses: boolean
   onSelectDistrict: (id: number) => void
   drawing: { points: LatLng[]; path: [number, number][] | null } | null
-  onMapClick: (point: LatLng) => void
+  onMapClick: (point: LatLng, onBuilding: boolean) => void
   sheetSnap?: Snap // на телефоне: карта центрирует выбранное над шторкой
   alerts: DistrictAlert[] // районы с активными жалобами жителей
+  building: { markers: BuildMarker[]; onMove: (uid: number, point: LatLng, onBuilding: boolean) => void } | null // конструктор
+}
+
+export type BuildMarker = { uid: number; lat: number; lng: number; radiusM: number; label: string; name: string; invalid: boolean }
+
+/** Стоит ли точка на здании — по слою зданий самой подложки. */
+function onBuildingAt(map: MapLibreMap, lngLat: LngLat): boolean {
+  const layers = map.getStyle().layers.flatMap((l) => ('source-layer' in l && l['source-layer'] === 'building' ? [l.id] : []))
+  return layers.length > 0 && map.queryRenderedFeatures(map.project(lngLat), { layers }).length > 0
 }
 
 function cssVar(name: string): string {
@@ -47,7 +56,7 @@ function addLayers(map: MapLibreMap) {
   const [good, mid, bad, route, accent, surface, text] = ['--good', '--mid', '--bad', '--route', '--accent', '--surface', '--text'].map(cssVar)
   const byLevel: ExpressionSpecification = ['match', ['get', 'level'], 'good', good, 'mid', mid, bad]
 
-  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points']) {
+  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones']) {
     map.addSource(id, { type: 'geojson', data: EMPTY })
   }
   map.addLayer({ id: 'district-fill', type: 'fill', source: 'districts', paint: { 'fill-color': byLevel, 'fill-opacity': 0.3 } })
@@ -115,22 +124,34 @@ function addLayers(map: MapLibreMap) {
     layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'icon-allow-overlap': true },
     paint: { 'text-color': surface, 'text-translate': ALERT_OFFSET },
   })
+  // Конструктор: круг влияния объекта — синий, если место подходит, красный, если нет
+  const zoneColor: ExpressionSpecification = ['case', ['get', 'invalid'], bad, route]
+  map.addLayer({ id: 'build-zone-fill', type: 'fill', source: 'build-zones', paint: { 'fill-color': zoneColor, 'fill-opacity': 0.14 } })
+  map.addLayer({ id: 'build-zone-line', type: 'line', source: 'build-zones', paint: { 'line-color': zoneColor, 'line-width': 2, 'line-dasharray': [2, 1] } })
 }
 
 export function CityMap(props: CityMapProps) {
-  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick, sheetSnap, alerts } = props
+  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick, sheetSnap, alerts, building } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   // Обработчики регистрируются один раз при загрузке карты — берём из ref последние версии
   const onSelectRef = useRef(onSelectDistrict)
   const onMapClickRef = useRef(onMapClick)
-  const isDrawingRef = useRef(drawing !== null)
+  const isDrawingRef = useRef(drawing !== null || building !== null)
   useEffect(() => {
     onSelectRef.current = onSelectDistrict
     onMapClickRef.current = onMapClick
-    isDrawingRef.current = drawing !== null
+    isDrawingRef.current = drawing !== null || building !== null
   })
-  const isDrawing = drawing !== null
+  // Рисование маршрута и конструктор забирают клики по карте себе
+  const isDrawing = drawing !== null || building !== null
+  const onMoveRef = useRef(building?.onMove)
+  useEffect(() => {
+    onMoveRef.current = building?.onMove
+  })
+  const markersRef = useRef(new Map<number, Marker>())
+  const draggingRef = useRef<number | null>(null) // значок под пальцем не двигаем из пропсов
+  const buildMarkers = building?.markers
   const drawPoints = drawing?.points
   const drawPath = drawing?.path
 
@@ -148,7 +169,7 @@ export function CityMap(props: CityMapProps) {
     instance.on('load', () => {
       addLayers(instance)
       instance.on('click', (event) => {
-        if (isDrawingRef.current) onMapClickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng })
+        if (isDrawingRef.current) onMapClickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng }, onBuildingAt(instance, event.lngLat))
       })
       instance.on('click', 'district-fill', (event) => {
         if (isDrawingRef.current) return
@@ -209,6 +230,48 @@ export function CityMap(props: CityMapProps) {
     map.getSource<GeoJSONSource>('alert-areas')?.setData(areas)
     map.getSource<GeoJSONSource>('alert-points')?.setData(points)
   }, [map, districts, alerts])
+
+  useEffect(() => {
+    if (!map) return
+    map.getSource<GeoJSONSource>('build-zones')?.setData(buildZoneCollection(buildMarkers ?? []))
+  }, [map, buildMarkers])
+
+  useEffect(() => {
+    if (!map) return
+    const markers = markersRef.current
+    const wanted = new Map((buildMarkers ?? []).map((m) => [m.uid, m]))
+    for (const [uid, marker] of markers) {
+      if (!wanted.has(uid)) {
+        marker.remove()
+        markers.delete(uid)
+      }
+    }
+    for (const m of wanted.values()) {
+      let marker = markers.get(m.uid)
+      if (!marker) {
+        const element = document.createElement('div')
+        const created = new Marker({ element, draggable: true }).setLngLat([m.lng, m.lat]).addTo(map)
+        const report = (done: boolean) => {
+          const at = created.getLngLat()
+          onMoveRef.current?.(m.uid, { lat: at.lat, lng: at.lng }, done && onBuildingAt(map, at))
+        }
+        created.on('dragstart', () => { draggingRef.current = m.uid })
+        created.on('drag', () => report(false))
+        created.on('dragend', () => { draggingRef.current = null; report(true) })
+        markers.set(m.uid, created)
+        marker = created
+      } else if (draggingRef.current !== m.uid) {
+        marker.setLngLat([m.lng, m.lat])
+      }
+      const element = marker.getElement()
+      element.className = `${styles.buildMarker} ${m.invalid ? styles.buildMarkerInvalid : ''}`
+      element.textContent = m.label
+      element.title = m.name
+      element.setAttribute('aria-label', m.name)
+    }
+  }, [map, buildMarkers])
+
+  useEffect(() => () => markersRef.current.forEach((marker) => marker.remove()), [])
 
   const hasAlerts = alerts.length > 0
   useEffect(() => {

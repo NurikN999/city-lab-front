@@ -25,4 +25,9 @@ describe('late responses', () => {
     const drawing: View = { mode: 'draw', districtId: 7 }
     expect(afterAiPlan(drawing, plan)).toBe(drawing)
   })
+
+  it('does not interrupt the city builder with AI results', () => {
+    const building: View = { mode: 'build' }
+    expect(afterAiPlan(building, plan)).toBe(building)
+  })
 })

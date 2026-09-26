@@ -194,3 +194,14 @@ export function lineCollection(path: [number, number][] | null): FeatureCollecti
   if (!path || path.length < 2) return collection<LineString, Record<string, never>>([])
   return collection([{ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: path }, properties: {} }])
 }
+
+/** Круги влияния объектов конструктора; invalid — место не подходит (красим в тревожный цвет). */
+export function buildZoneCollection(
+  zones: { uid: number; lat: number; lng: number; radiusM: number; invalid: boolean }[],
+): FeatureCollection<Polygon, { uid: number; invalid: boolean }> {
+  return collection(zones.map((z) => ({
+    type: 'Feature' as const,
+    geometry: circlePolygon({ lat: z.lat, lng: z.lng }, z.radiusM),
+    properties: { uid: z.uid, invalid: z.invalid },
+  })))
+}
