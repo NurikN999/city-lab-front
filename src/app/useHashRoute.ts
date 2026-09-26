@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react'
 
-export type AppRoute = { page: 'city' } | { page: 'compare'; ids: number[] } | { page: 'model' }
+export type AppRoute = { page: 'city' } | { page: 'compare'; ids: number[] } | { page: 'model' } | { page: 'report' }
 
 export function parseHash(hash: string): AppRoute {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   if (path === '/model') return { page: 'model' }
+  if (path === '/report') return { page: 'report' }
   if (path === '/compare') {
     const ids = (new URLSearchParams(query).get('ids') ?? '')
       .split(',')

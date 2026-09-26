@@ -7,6 +7,7 @@ import { useHashRoute } from './useHashRoute'
 const CityPage = lazy(() => import('../features/city/CityPage'))
 const ComparePage = lazy(() => import('../features/compare/ComparePage'))
 const ModelPage = lazy(() => import('../features/model/ModelPage'))
+const ReportPage = lazy(() => import('../features/complaints/ReportPage'))
 
 export function App() {
   const route = useHashRoute()
@@ -20,6 +21,7 @@ export function App() {
             {route.page === 'city' && <CityPage />}
             {route.page === 'compare' && <ComparePage ids={route.ids} />}
             {route.page === 'model' && <ModelPage />}
+            {route.page === 'report' && <ReportPage />}
           </Suspense>
         </ErrorBoundary>
       </main>

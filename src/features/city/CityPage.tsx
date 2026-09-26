@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
 import type { Action, BusRoute, CityResponse, LatLng, MetricValues } from '../../shared/lib/schemas'
 import { AiBar } from './components/AiBar'
@@ -16,6 +16,12 @@ import { ResultPanel } from './components/ResultPanel'
 import { ScenarioTray } from './components/ScenarioTray'
 import type { RouteLayer } from './geo'
 import { useMediaQuery } from '../../shared/hooks/useMediaQuery'
+import { setComplaintStatus } from '../complaints/api'
+import { ComplaintToasts } from '../complaints/ComplaintToasts'
+import { DistrictComplaints } from '../complaints/DistrictComplaints'
+import { alertsByDistrict } from '../complaints/feed'
+import { useComplaintFeed } from '../complaints/useComplaintFeed'
+import { readToken } from '../model/session'
 import { BottomSheet } from './components/BottomSheet'
 import { useCityData } from './hooks/useCityData'
 import { useRouteDrawing } from './hooks/useRouteDrawing'
@@ -39,6 +45,8 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const [sphere, setSphere] = useState<LayerSphere>('transport')
   const [view, setView] = useState<View>({ mode: 'explore' })
   const isMobile = useMediaQuery(MOBILE)
+  const feed = useComplaintFeed()
+  const alerts = useMemo(() => alertsByDistrict(feed.complaints), [feed.complaints])
   const [tab, setTab] = useState<ExploreTab>('problems')
   // Положение шторки задаёт режим; ручная правка действует, пока режим не сменился
   const [sheet, setSheet] = useState<{ mode: View['mode']; snap: Snap }>({ mode: 'explore', snap: 'peek' })
@@ -114,6 +122,20 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     : 'Актау сейчас'
   const routesOnMap: RouteLayer[] = resultRoute ? [{ route: resultRoute, emphasis: 'selected' }] : mapRoutes
 
+  // Акимат (вошёл на странице «Модель») может закрывать жалобы прямо из панели района
+  const token = readToken()
+  const moderate = token
+    ? (id: number, status: 'resolved' | 'hidden') => { setComplaintStatus(id, status, token).then(feed.refresh).catch(() => {}) }
+    : null
+  const toasts = view.mode !== 'draw' && (
+    <ComplaintToasts
+      items={feed.fresh}
+      districtName={(id) => city.districts.find((d) => d.id === id)?.name ?? 'район'}
+      onOpen={selectDistrict}
+      onDismiss={feed.dismiss}
+    />
+  )
+
   const map = (
     <CityMap
       districts={city.districts}
@@ -128,6 +150,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       drawing={view.mode === 'draw' ? { points: drawing.points, path: drawing.path } : null}
       onMapClick={handleMapClick}
       sheetSnap={isMobile ? snap : undefined}
+      alerts={alerts}
     />
   )
 
@@ -160,7 +183,9 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       onChooseRoute={(routeId) => setDraft((current) => current && chooseRoute(current, routeId))}
       onClose={() => setView({ mode: 'explore' })}
       onDrawRoute={startDrawing}
-    />
+    >
+      <DistrictComplaints complaints={feed.complaints.filter((c) => c.district_id === district.id)} onStatus={moderate} />
+    </DistrictPanel>
   ) : null
 
   const tray = view.mode === 'district' && draft ? (
@@ -188,6 +213,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     return (
       <div className={styles.mobile}>
         {map}
+        {toasts}
         {view.mode !== 'draw' && <div className={styles.mobileTop}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
         {view.mode !== 'draw' && <div className={styles.mobileLegend}><Legend metric={metric} compact /></div>}
         <BottomSheet snap={snap} onSnapChange={(next) => setSheet({ mode: view.mode, snap: next })} label={rightTitle} footer={tray} resetKey={view.mode}>
@@ -212,6 +238,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   return (
     <div className={`${styles.screen} ${view.mode === 'draw' ? styles.drawing : ''}`}>
       {map}
+      {toasts}
       {view.mode !== 'draw' && <div className={styles.top}><LayerSwitch active={sphere} onChange={setSphere} /></div>}
       {view.mode !== 'draw' && (
         // Во время рисования список районов скрыт: выбор другого района стёр бы точки

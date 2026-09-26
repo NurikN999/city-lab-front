@@ -5,6 +5,7 @@ const LINKS = [
   { page: 'city', href: '#/', label: 'Город' },
   { page: 'compare', href: '#/compare', label: 'Сравнение' },
   { page: 'model', href: '#/model', label: 'Модель' },
+  { page: 'report', href: '#/report', label: 'Жалоба' },
 ] as const
 
 export function Header({ page }: { page: AppRoute['page'] }) {

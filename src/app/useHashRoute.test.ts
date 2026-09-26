@@ -21,4 +21,8 @@ describe('parseHash', () => {
   it('builds compare links', () => {
     expect(compareHref([4, 7])).toBe('#/compare?ids=4,7')
   })
+
+  it('opens the complaint form', () => {
+    expect(parseHash('#/report')).toEqual({ page: 'report' })
+  })
 })

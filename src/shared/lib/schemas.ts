@@ -180,3 +180,16 @@ export type LoginResponse = z.infer<typeof loginResponseSchema>
 export type ScenarioItemInput =
   | { action_id: number; district_id: number }
   | { action_id: number; route_id: number }
+
+export const complaintCategorySchema = z.enum(['transport', 'climate', 'water', 'social', 'other'])
+export type ComplaintCategory = z.infer<typeof complaintCategorySchema>
+export const complaintSchema = z.object({
+  id: z.number(),
+  district_id: z.number(),
+  category: complaintCategorySchema,
+  text: z.string(),
+  status: z.enum(['new', 'accepted', 'resolved', 'hidden']),
+  created_at: z.string(),
+})
+export type Complaint = z.infer<typeof complaintSchema>
+export const complaintsSchema = z.array(complaintSchema)

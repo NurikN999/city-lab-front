@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { formatMoney, levelOf } from '../../../shared/lib/format'
 import type { Action, BusRoute, District, Metric } from '../../../shared/lib/schemas'
 import type { Draft } from '../scenario'
@@ -13,9 +14,10 @@ type DistrictPanelProps = {
   onChooseRoute: (routeId: number) => void
   onClose: () => void
   onDrawRoute: () => void
+  children?: ReactNode // блок жалоб жителей под метриками
 }
 
-export function DistrictPanel({ district, metrics, actions, routes, draft, onToggle, onChooseRoute, onClose, onDrawRoute }: DistrictPanelProps) {
+export function DistrictPanel({ district, metrics, actions, routes, draft, onToggle, onChooseRoute, onClose, onDrawRoute, children }: DistrictPanelProps) {
   const servingRoutes = routes.filter((r) => r.district_ids.includes(district.id) || r.id === draft.routeId)
   const available = actions.filter((a) => a.scope === 'district' || servingRoutes.length > 0)
   const routeActionOn = actions.some((a) => a.scope === 'route' && draft.actionIds.includes(a.id))
@@ -43,6 +45,7 @@ export function DistrictPanel({ district, metrics, actions, routes, draft, onTog
           ]
         })}
       </dl>
+      {children}
 
       <h3 className={styles.title}>Действия</h3>
       <ul className={styles.actionList}>

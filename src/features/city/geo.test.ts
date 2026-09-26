@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Metric } from '../../shared/lib/schemas'
-import { busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
+import { alertCollections, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
 
 const traffic: Metric = { key: 'traffic', name: 'Загрузка дорог', unit: '%', sphere: 'transport', lower_is_better: true, min: 0, max: 100, is_computed: false }
 
@@ -95,5 +95,14 @@ describe('geo', () => {
   it('has no cap when the district did not improve', () => {
     expect(ghostCollection([district], { '11': { traffic: 50 } }, { '11': { traffic: 50 } }, traffic).features).toHaveLength(0)
     expect(ghostCollection([district], { '11': { traffic: 40 } }, { '11': { traffic: 50 } }, traffic).features).toHaveLength(0)
+  })
+
+  it('marks districts with complaints as burning areas with a counter', () => {
+    const { areas, points } = alertCollections([district], [{ districtId: 11, count: 3 }, { districtId: 999, count: 1 }])
+
+    expect(areas.features).toHaveLength(1)
+    expect(areas.features[0].geometry).toEqual(district.boundary)
+    expect(points.features[0].properties).toEqual({ id: 11, count: 3, label: '3' })
+    expect(points.features[0].geometry.coordinates).toEqual([district.center.lng, district.center.lat])
   })
 })

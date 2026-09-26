@@ -108,6 +108,30 @@ export function ghostCollection(
   return collection(features)
 }
 
+export type DistrictAlert = { districtId: number; count: number }
+
+/** Районы с жалобами: полигоны для «горящей» заливки и точки в центре со счётчиком. */
+export function alertCollections(districts: District[], alerts: DistrictAlert[]): {
+  areas: FeatureCollection<Polygon, { id: number; count: number }>
+  points: FeatureCollection<Point, { id: number; count: number; label: string }>
+} {
+  const byId = new Map(districts.map((d) => [d.id, d]))
+  const hits = alerts.flatMap((alert) => {
+    const district = byId.get(alert.districtId)
+    return district ? [{ district, count: alert.count }] : []
+  })
+  return {
+    areas: collection(hits.map(({ district, count }) => ({
+      type: 'Feature' as const, geometry: district.boundary, properties: { id: district.id, count },
+    }))),
+    points: collection(hits.map(({ district, count }) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [district.center.lng, district.center.lat] },
+      properties: { id: district.id, count, label: String(count) },
+    }))),
+  }
+}
+
 export function circlePolygon(center: LatLng, radiusM: number, steps = 32): Polygon {
   const ring: [number, number][] = []
   for (let i = 0; i <= steps; i++) {

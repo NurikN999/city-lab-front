@@ -4,8 +4,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { District, LatLng, Metric, MetricValues } from '../../../shared/lib/schemas'
 import {
-  busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
-  labelCollection, lineCollection, numberedStops, routeCollection, stopCollection, type RouteLayer,
+  alertCollections, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
+  labelCollection, lineCollection, numberedStops, routeCollection, type DistrictAlert, stopCollection, type RouteLayer,
 } from '../geo'
 import { snapHeight, type Snap } from '../sheet'
 import styles from './CityMap.module.css'
@@ -19,6 +19,9 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 const AKTAU_CENTER: [number, number] = [51.165, 43.655]
 const STOP_RADIUS_M = 500
 const BUS_LAP_MS = 20_000
+const ALERT_PULSE_MS = 1600
+// Отметка жалоб над подписью района, а не поверх неё
+const ALERT_OFFSET: [number, number] = [0, -42]
 
 type CityMapProps = {
   districts: District[]
@@ -33,6 +36,7 @@ type CityMapProps = {
   drawing: { points: LatLng[]; path: [number, number][] | null } | null
   onMapClick: (point: LatLng) => void
   sheetSnap?: Snap // на телефоне: карта центрирует выбранное над шторкой
+  alerts: DistrictAlert[] // районы с активными жалобами жителей
 }
 
 function cssVar(name: string): string {
@@ -43,7 +47,7 @@ function addLayers(map: MapLibreMap) {
   const [good, mid, bad, route, accent, surface, text] = ['--good', '--mid', '--bad', '--route', '--accent', '--surface', '--text'].map(cssVar)
   const byLevel: ExpressionSpecification = ['match', ['get', 'level'], 'good', good, 'mid', mid, bad]
 
-  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops']) {
+  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points']) {
     map.addSource(id, { type: 'geojson', data: EMPTY })
   }
   map.addLayer({ id: 'district-fill', type: 'fill', source: 'districts', paint: { 'fill-color': byLevel, 'fill-opacity': 0.3 } })
@@ -95,10 +99,26 @@ function addLayers(map: MapLibreMap) {
     layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-allow-overlap': true },
     paint: { 'text-color': route },
   })
+  // Жалобы жителей: район «горит» — заливка и контур под столбиками, кольцо и счётчик поверх всего
+  map.addLayer({ id: 'alert-fill', type: 'fill', source: 'alert-areas', paint: { 'fill-color': bad, 'fill-opacity': 0.25 } }, 'coverage')
+  map.addLayer({ id: 'alert-line', type: 'line', source: 'alert-areas', paint: { 'line-color': bad, 'line-width': 3 } }, 'coverage')
+  map.addLayer({
+    id: 'alert-pulse', type: 'circle', source: 'alert-points',
+    paint: { 'circle-radius': 14, 'circle-color': bad, 'circle-opacity': 0, 'circle-stroke-color': bad, 'circle-stroke-width': 3, 'circle-stroke-opacity': 0.8, 'circle-translate': ALERT_OFFSET },
+  })
+  map.addLayer({
+    id: 'alert-dot', type: 'circle', source: 'alert-points',
+    paint: { 'circle-radius': 11, 'circle-color': bad, 'circle-stroke-color': surface, 'circle-stroke-width': 2, 'circle-translate': ALERT_OFFSET },
+  })
+  map.addLayer({
+    id: 'alert-count', type: 'symbol', source: 'alert-points',
+    layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'icon-allow-overlap': true },
+    paint: { 'text-color': surface, 'text-translate': ALERT_OFFSET },
+  })
 }
 
 export function CityMap(props: CityMapProps) {
-  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick, sheetSnap } = props
+  const { districts, metric, values, ghostValues, selectedId, routes, coverageStops, animateBuses, onSelectDistrict, drawing, onMapClick, sheetSnap, alerts } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
   // Обработчики регистрируются один раз при загрузке карты — берём из ref последние версии
@@ -182,6 +202,27 @@ export function CityMap(props: CityMapProps) {
     map.getSource<GeoJSONSource>('draft-path')?.setData(lineCollection(drawPath ?? null))
     map.getSource<GeoJSONSource>('draft-stops')?.setData(numberedStops(drawPoints ?? []))
   }, [map, drawPoints, drawPath])
+
+  useEffect(() => {
+    if (!map) return
+    const { areas, points } = alertCollections(districts, alerts)
+    map.getSource<GeoJSONSource>('alert-areas')?.setData(areas)
+    map.getSource<GeoJSONSource>('alert-points')?.setData(points)
+  }, [map, districts, alerts])
+
+  const hasAlerts = alerts.length > 0
+  useEffect(() => {
+    if (!map || !hasAlerts || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    // Пульс «события на карте»: кольцо расходится и гаснет, заливка района дышит
+    let frame = requestAnimationFrame(function pulse(time) {
+      const t = (time % ALERT_PULSE_MS) / ALERT_PULSE_MS
+      map.setPaintProperty('alert-pulse', 'circle-radius', 12 + 26 * t)
+      map.setPaintProperty('alert-pulse', 'circle-stroke-opacity', 0.9 * (1 - t))
+      map.setPaintProperty('alert-fill', 'fill-opacity', 0.15 + 0.2 * (0.5 + 0.5 * Math.sin(2 * Math.PI * t)))
+      frame = requestAnimationFrame(pulse)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [map, hasAlerts])
 
   useEffect(() => {
     if (!map) return

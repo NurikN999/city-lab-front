@@ -1,0 +1,251 @@
+/* Уведомления о новых жалобах поверх карты */
+.toasts {
+  position: absolute;
+  z-index: 3;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(24rem, calc(100% - 1rem));
+  display: grid;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--bad);
+  border-radius: 0.875rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(207 58 46 / 0.25);
+  pointer-events: auto;
+  animation: toast-in 0.25s ease-out;
+}
+
+.toastBody {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.625rem 0.75rem;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.toastTitle {
+  font-weight: 700;
+  color: var(--bad);
+}
+
+.toastMeta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.toastText {
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toastClose {
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.125rem;
+  cursor: pointer;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 63.99rem) {
+  .toasts { top: 6.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+/* Жалобы в панели района */
+.district {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--bad-soft);
+}
+
+.districtTitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--bad);
+}
+
+.list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.itemMeta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.itemText {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.itemActions {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+}
+
+.itemActions button {
+  min-height: 2rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+/* Страница жалобы */
+.page {
+  display: grid;
+  gap: 1.25rem;
+  width: min(36rem, 100%);
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  box-sizing: border-box;
+}
+
+.pageHead {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.pageHint {
+  margin: 0;
+  color: var(--muted);
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.375rem;
+  font-weight: 600;
+}
+
+.field select,
+.field textarea {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.counter {
+  justify-self: end;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.categories legend {
+  margin-bottom: 0.375rem;
+  font-weight: 600;
+}
+
+.category {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.category:has(input:checked) {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.submit {
+  min-height: 3rem;
+  border: 0;
+  border-radius: 0.875rem;
+  background: var(--bad);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.success {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--good-soft);
+  color: var(--text);
+}
+
+.error {
+  margin: 0;
+  color: var(--bad);
+}
