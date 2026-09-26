@@ -1,0 +1,103 @@
+.palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.object {
+  display: grid;
+  gap: 0.125rem;
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.object[aria-pressed='true'] {
+  border-color: var(--route);
+  background: var(--route-soft);
+}
+
+.objectName {
+  font-weight: 600;
+}
+
+.objectMeta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.placed {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.placedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.problem {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--bad);
+}
+
+.effect {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--bg);
+}
+
+.effectTitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.rows {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.rows div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.rows dd {
+  margin: 0;
+}
+
+.top {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.save {
+  display: grid;
+  gap: 0.5rem;
+}

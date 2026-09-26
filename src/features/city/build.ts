@@ -1,4 +1,5 @@
-import type { Action, District, LatLng, ScenarioItemInput } from '../../shared/lib/schemas'
+import { isImprovement } from '../../shared/lib/format'
+import type { Action, District, LatLng, Metric, ScenarioItemInput, SimulationResult } from '../../shared/lib/schemas'
 import { pathLengthKm } from './drawing'
 
 /** Объект конструктора на карте. onBuilding — место занято зданием (проверяет карта). */
@@ -50,4 +51,27 @@ export function buildName(placements: Placement[], actions: Action[]): string {
     counts.set(name, (counts.get(name) ?? 0) + 1)
   }
   return `Конструктор: ${[...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(' + ')}`
+}
+
+export type DistrictChange = { district: string; metric: string; delta: number; improved: boolean }
+
+/** Районы, которые конструктор изменил сильнее всего: у каждого — самая сдвинувшаяся метрика. */
+export function topDistrictChanges(result: SimulationResult, metrics: Metric[], districts: District[], limit = 3): DistrictChange[] {
+  const changes: DistrictChange[] = []
+  for (const district of districts) {
+    const before = result.before.districts[String(district.id)] ?? {}
+    const after = result.after.districts[String(district.id)] ?? {}
+    let best: DistrictChange | null = null
+    for (const metric of metrics) {
+      const b = before[metric.key]
+      const a = after[metric.key]
+      if (b === undefined || a === undefined) continue
+      const delta = Math.round((a - b) * 10) / 10
+      if (delta !== 0 && (!best || Math.abs(delta) > Math.abs(best.delta))) {
+        best = { district: district.name, metric: metric.name, delta, improved: isImprovement(delta, metric) }
+      }
+    }
+    if (best) changes.push(best)
+  }
+  return changes.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, limit)
 }

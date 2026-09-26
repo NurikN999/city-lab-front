@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Action, District } from '../../shared/lib/schemas'
-import { buildCost, buildItems, buildName, districtAt, placementProblems, type Placement } from './build'
+import type { Action, District, Metric, SimulationResult } from '../../shared/lib/schemas'
+import { buildCost, buildItems, buildName, districtAt, placementProblems, topDistrictChanges, type Placement } from './build'
 
 const square = (lng: number, lat: number): District['boundary'] => ({
   type: 'Polygon',
@@ -47,5 +47,19 @@ describe('city builder', () => {
     expect(buildCost(placements, actions)).toBe(75_000_000)
     expect(buildName(placements, actions)).toBe('Конструктор: Школа + Сквер ×2')
     expect(buildItems(placements)[0]).toEqual({ action_id: 20, lat: 43.66, lng: 51.16 })
+  })
+
+  it('names the districts that changed the most', () => {
+    const metric = (key: 'heat' | 'social_access', name: string, lowerIsBetter: boolean): Metric => ({ key, name, unit: '%', sphere: 'social', lower_is_better: lowerIsBetter, min: 0, max: 100, is_computed: false })
+    const metrics = [metric('heat', 'Индекс жары', true), metric('social_access', 'Доступность соцобъектов', false)]
+    const result: SimulationResult = {
+      before: { city: {}, districts: { '11': { heat: 76, social_access: 66 }, '12': { heat: 70, social_access: 60 } } },
+      after: { city: {}, districts: { '11': { heat: 74, social_access: 75.9 }, '12': { heat: 70, social_access: 60 } } },
+      cost: 0, budget: 100_000_000, over_budget: false, assumptions: { actions: [], couplings: [] },
+    }
+
+    expect(topDistrictChanges(result, metrics, districts)).toEqual([
+      { district: '12 мкр', metric: 'Доступность соцобъектов', delta: 9.9, improved: true },
+    ])
   })
 })
