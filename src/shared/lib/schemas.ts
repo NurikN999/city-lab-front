@@ -61,7 +61,8 @@ export const actionSchema = z.object({
   name: z.string(),
   sphere: sphereSchema,
   cost: z.number(),
-  scope: z.enum(['district', 'route']),
+  scope: z.enum(['district', 'route', 'point']), // point — объект конструктора на карте
+  radius_m: z.number().nullable().optional(),
   assumption: z.string(),
   source_url: z.string().nullable(),
   effects: z.array(actionEffectSchema),
@@ -118,6 +119,8 @@ export const scenarioSchema = z.object({
     district_id: z.number().nullable(),
     route_id: z.number().nullable(),
     quantity: z.number(),
+    lat: z.number().nullable().optional(),
+    lng: z.number().nullable().optional(),
   })),
   created_at: z.string(),
 })
@@ -180,6 +183,7 @@ export type LoginResponse = z.infer<typeof loginResponseSchema>
 export type ScenarioItemInput =
   | { action_id: number; district_id: number }
   | { action_id: number; route_id: number }
+  | { action_id: number; lat: number; lng: number }
 
 export const complaintCategorySchema = z.enum(['transport', 'climate', 'water', 'social', 'other'])
 export type ComplaintCategory = z.infer<typeof complaintCategorySchema>

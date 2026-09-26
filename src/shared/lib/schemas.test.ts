@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aiPlanResponseSchema, complaintsSchema, cityResponseSchema, routePreviewSchema, scenarioWithResultSchema } from './schemas'
+import { actionSchema, aiPlanResponseSchema, complaintsSchema, cityResponseSchema, routePreviewSchema, scenarioWithResultSchema } from './schemas'
 
 const district = {
   id: 11, name: '12 мкр', population: 10000, center: { lat: 43.669365, lng: 51.16699 },
@@ -62,5 +62,10 @@ describe('schemas', () => {
   it('parses GET /complaints', () => {
     const [complaint] = complaintsSchema.parse([{ id: 1, district_id: 11, category: 'other', text: 'Нет урн', status: 'new', created_at: '2026-09-26T10:00:00+00:00' }])
     expect(complaint.category).toBe('other')
+  })
+
+  it('parses map objects of the city builder', () => {
+    const action = actionSchema.parse({ id: 20, key: 'school', name: 'Школа', sphere: { key: 'social', name: 'Соцобъекты' }, cost: 45_000_000, scope: 'point', radius_m: 500, assumption: '', source_url: null, effects: [] })
+    expect(action.radius_m).toBe(500)
   })
 })
