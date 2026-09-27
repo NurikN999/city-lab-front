@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Complaint } from '../../shared/lib/schemas'
-import { alertsByDistrict, timeAgo } from './feed'
+import { alertsByDistrict, suggestedObject, timeAgo } from './feed'
 
 const complaint = (id: number, districtId: number): Complaint => ({
   id, district_id: districtId, category: 'transport', text: 'Пробка у школы', status: 'new', created_at: '2026-09-26T10:00:00Z',
@@ -19,5 +19,12 @@ describe('complaint feed helpers', () => {
     expect(timeAgo('2026-09-26T09:59:40Z', now)).toBe('только что')
     expect(timeAgo('2026-09-26T09:48:00Z', now)).toBe('12 мин назад')
     expect(timeAgo('2026-09-26T07:00:00Z', now)).toBe('3 ч назад')
+  })
+
+  it('suggests a builder object that answers the complaint', () => {
+    expect(suggestedObject('transport')).toBe('bus_stop')
+    expect(suggestedObject('climate')).toBe('park')
+    expect(suggestedObject('social')).toBe('clinic')
+    expect(suggestedObject('water')).toBeNull()
   })
 })

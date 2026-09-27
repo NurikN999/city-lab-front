@@ -4,7 +4,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { District, LatLng, Metric, MetricValues } from '../../../shared/lib/schemas'
 import {
-  alertCollections, buildZoneCollection, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
+  alertCollections, buildObjectCollection, buildZoneCollection, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
   labelCollection, lineCollection, numberedStops, routeCollection, type DistrictAlert, stopCollection, type RouteLayer,
 } from '../geo'
 import { snapHeight, type Snap } from '../sheet'
@@ -22,6 +22,7 @@ const BUS_LAP_MS = 20_000
 const ALERT_PULSE_MS = 1600
 // Отметка жалоб над подписью района, а не поверх неё
 const ALERT_OFFSET: [number, number] = [0, -42]
+const GROW_MS = 700 // объект конструктора «вырастает» из земли
 
 type CityMapProps = {
   districts: District[]
@@ -40,7 +41,7 @@ type CityMapProps = {
   building: { markers: BuildMarker[]; onMove: (uid: number, point: LatLng, onBuilding: boolean) => void } | null // конструктор
 }
 
-export type BuildMarker = { uid: number; lat: number; lng: number; radiusM: number; label: string; name: string; invalid: boolean }
+export type BuildMarker = { uid: number; lat: number; lng: number; radiusM: number; label: string; name: string; kind: string; invalid: boolean }
 
 /** Стоит ли точка на здании — по слою зданий самой подложки. */
 function onBuildingAt(map: MapLibreMap, lngLat: LngLat): boolean {
@@ -56,7 +57,7 @@ function addLayers(map: MapLibreMap) {
   const [good, mid, bad, route, accent, surface, text] = ['--good', '--mid', '--bad', '--route', '--accent', '--surface', '--text'].map(cssVar)
   const byLevel: ExpressionSpecification = ['match', ['get', 'level'], 'good', good, 'mid', mid, bad]
 
-  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones']) {
+  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones', 'build-objects']) {
     map.addSource(id, { type: 'geojson', data: EMPTY })
   }
   map.addLayer({ id: 'district-fill', type: 'fill', source: 'districts', paint: { 'fill-color': byLevel, 'fill-opacity': 0.3 } })
@@ -128,6 +129,11 @@ function addLayers(map: MapLibreMap) {
   const zoneColor: ExpressionSpecification = ['case', ['get', 'invalid'], bad, route]
   map.addLayer({ id: 'build-zone-fill', type: 'fill', source: 'build-zones', paint: { 'fill-color': zoneColor, 'fill-opacity': 0.14 } })
   map.addLayer({ id: 'build-zone-line', type: 'line', source: 'build-zones', paint: { 'line-color': zoneColor, 'line-width': 2, 'line-dasharray': [2, 1] } })
+  // Конструктор: объёмные здания объектов своего цвета; неподходящее место — тревожный цвет
+  const byKind: ExpressionSpecification = ['case', ['get', 'invalid'], bad, ['match', ['get', 'kind'],
+    'school', cssVar('--object-school'), 'kindergarten', cssVar('--object-kindergarten'), 'clinic', cssVar('--object-clinic'),
+    'park', cssVar('--object-park'), 'bus_stop', cssVar('--object-stop'), route]]
+  map.addLayer({ id: 'build-objects', type: 'fill-extrusion', source: 'build-objects', paint: { 'fill-extrusion-color': byKind, 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.95 } })
 }
 
 export function CityMap(props: CityMapProps) {
@@ -236,6 +242,30 @@ export function CityMap(props: CityMapProps) {
     map.getSource<GeoJSONSource>('build-zones')?.setData(buildZoneCollection(buildMarkers ?? []))
   }, [map, buildMarkers])
 
+  const bornRef = useRef(new Map<number, number>())
+  useEffect(() => {
+    if (!map) return
+    const markers = buildMarkers ?? []
+    const born = bornRef.current
+    const now = performance.now()
+    for (const uid of born.keys()) if (!markers.some((m) => m.uid === uid)) born.delete(uid)
+    for (const m of markers) if (!born.has(m.uid)) born.set(m.uid, now)
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const source = map.getSource<GeoJSONSource>('build-objects')
+    let frame = 0
+    const paint = (time: number) => {
+      let growing = false
+      source?.setData(buildObjectCollection(markers.map((m) => {
+        const t = still ? 1 : Math.min(1, (time - (born.get(m.uid) ?? time)) / GROW_MS)
+        if (t < 1) growing = true
+        return { uid: m.uid, lat: m.lat, lng: m.lng, kind: m.kind, invalid: m.invalid, grow: 1 - (1 - t) ** 3 }
+      })))
+      if (growing) frame = requestAnimationFrame(paint)
+    }
+    paint(now)
+    return () => cancelAnimationFrame(frame)
+  }, [map, buildMarkers])
+
   useEffect(() => {
     if (!map) return
     const markers = markersRef.current
@@ -250,7 +280,8 @@ export function CityMap(props: CityMapProps) {
       let marker = markers.get(m.uid)
       if (!marker) {
         const element = document.createElement('div')
-        const created = new Marker({ element, draggable: true }).setLngLat([m.lng, m.lat]).addTo(map)
+        // Ручка под зданием, а не поверх него: само здание остаётся видно
+        const created = new Marker({ element, draggable: true, anchor: 'top', offset: [0, 12] }).setLngLat([m.lng, m.lat]).addTo(map)
         const report = (done: boolean) => {
           const at = created.getLngLat()
           onMoveRef.current?.(m.uid, { lat: at.lat, lng: at.lng }, done && onBuildingAt(map, at))
@@ -264,14 +295,19 @@ export function CityMap(props: CityMapProps) {
         marker.setLngLat([m.lng, m.lat])
       }
       const element = marker.getElement()
-      element.className = `${styles.buildMarker} ${m.invalid ? styles.buildMarkerInvalid : ''}`
+      // Только свои классы: служебный класс MapLibre отвечает за позиционирование значка
+      element.classList.add(styles.buildMarker)
+      element.classList.toggle(styles.buildMarkerInvalid, m.invalid)
       element.textContent = m.label
       element.title = m.name
       element.setAttribute('aria-label', m.name)
     }
   }, [map, buildMarkers])
 
-  useEffect(() => () => markersRef.current.forEach((marker) => marker.remove()), [])
+  useEffect(() => () => {
+    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current.clear()
+  }, [])
 
   const hasAlerts = alerts.length > 0
   useEffect(() => {

@@ -27,4 +27,20 @@ describe('DistrictComplaints', () => {
     const { container } = render(<DistrictComplaints complaints={[]} onStatus={null} />)
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('sends a complaint to the city builder', async () => {
+    const onSolve = vi.fn()
+    render(<DistrictComplaints complaints={[{ ...item, category: 'transport' }]} onStatus={null} onSolve={onSolve} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Решить в конструкторе: Нет воды с утра' }))
+
+    expect(onSolve).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }))
+  })
+
+  it('shows which scenario took the complaint into work', () => {
+    render(<DistrictComplaints complaints={[{ ...item, status: 'accepted', scenario_id: 9, scenario_name: 'Конструктор: Остановка' }]} onStatus={null} onSolve={vi.fn()} />)
+
+    expect(screen.getByText('Принята · «Конструктор: Остановка»')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Решить в конструкторе/ })).not.toBeInTheDocument()
+  })
 })

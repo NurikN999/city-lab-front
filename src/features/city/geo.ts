@@ -205,3 +205,32 @@ export function buildZoneCollection(
     properties: { uid: z.uid, invalid: z.invalid },
   })))
 }
+
+/** Габариты объектов конструктора, м: ширина × глубина × высота. Условные, с запасом — чтобы было видно с высоты города. */
+const OBJECT_SHAPES: Record<string, { width: number; depth: number; height: number }> = {
+  school: { width: 120, depth: 75, height: 45 },
+  kindergarten: { width: 75, depth: 75, height: 24 },
+  clinic: { width: 90, depth: 70, height: 40 },
+  park: { width: 120, depth: 120, height: 4 },
+  bus_stop: { width: 40, depth: 16, height: 12 },
+}
+const DEFAULT_SHAPE = { width: 30, depth: 30, height: 8 }
+
+/** 3D-здания объектов конструктора; grow 0..1 — доля высоты, пока здание «вырастает». */
+export function buildObjectCollection(
+  objects: { uid: number; lat: number; lng: number; kind: string; invalid: boolean; grow: number }[],
+): FeatureCollection<Polygon, { uid: number; kind: string; invalid: boolean; height: number }> {
+  return collection(objects.map((o) => {
+    const shape = OBJECT_SHAPES[o.kind] ?? DEFAULT_SHAPE
+    const dLat = shape.depth / 2 / METERS_PER_DEG_LAT
+    const dLng = shape.width / 2 / metersPerDegLng(o.lat)
+    return {
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [[[o.lng - dLng, o.lat - dLat], [o.lng + dLng, o.lat - dLat], [o.lng + dLng, o.lat + dLat], [o.lng - dLng, o.lat + dLat], [o.lng - dLng, o.lat - dLat]]],
+      },
+      properties: { uid: o.uid, kind: o.kind, invalid: o.invalid, height: shape.height * o.grow },
+    }
+  }))
+}

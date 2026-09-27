@@ -5,7 +5,7 @@ import {
   type AiPlanResponse, type BusRoute, type LatLng, type RoutePreview, type ScenarioItemInput, type ScenarioWithResult, type SimulationResult,
 } from '../../shared/lib/schemas'
 
-export function createScenario(body: { name: string; district_id: number; items: ScenarioItemInput[] }): Promise<ScenarioWithResult> {
+export function createScenario(body: { name: string; district_id: number; items: ScenarioItemInput[]; complaint_ids?: number[] }): Promise<ScenarioWithResult> {
   return request('/scenarios', scenarioWithResultSchema, { method: 'POST', body })
 }
 

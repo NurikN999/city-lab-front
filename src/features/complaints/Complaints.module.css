@@ -249,3 +249,24 @@
   margin: 0;
   color: var(--bad);
 }
+
+.accepted {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--good);
+}
+
+.solve {
+  justify-self: start;
+  min-height: 2rem;
+  margin-top: 0.25rem;
+  padding: 0 0.75rem;
+  border: 1px dashed var(--route);
+  border-radius: 0.5rem;
+  background: var(--route-soft);
+  color: var(--route);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}

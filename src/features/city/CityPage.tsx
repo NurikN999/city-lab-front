@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
-import type { Action, BusRoute, CityResponse, LatLng, MetricValues } from '../../shared/lib/schemas'
+import type { Action, BusRoute, CityResponse, Complaint, LatLng, MetricValues } from '../../shared/lib/schemas'
 import { createScenario } from './api'
 import { buildItems, districtAt, placementProblems, type Placement } from './build'
 import { AiBar } from './components/AiBar'
@@ -21,7 +21,7 @@ import { useMediaQuery } from '../../shared/hooks/useMediaQuery'
 import { setComplaintStatus } from '../complaints/api'
 import { ComplaintToasts } from '../complaints/ComplaintToasts'
 import { DistrictComplaints } from '../complaints/DistrictComplaints'
-import { alertsByDistrict } from '../complaints/feed'
+import { alertsByDistrict, suggestedObject } from '../complaints/feed'
 import { useComplaintFeed } from '../complaints/useComplaintFeed'
 import { readToken } from '../model/session'
 import { BottomSheet } from './components/BottomSheet'
@@ -54,6 +54,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   // Конструктор: объекты на карте, выбранный инструмент палитры и живой пересчёт
   const [placements, setPlacements] = useState<Placement[]>([])
   const [tool, setTool] = useState<number | null>(null)
+  const [solving, setSolving] = useState<Complaint | null>(null) // жалоба, которую решаем в конструкторе
   const nextUid = useRef(1)
   const objects = actions.filter((a) => a.scope === 'point')
   const placeProblems = useMemo(() => placementProblems(placements, city.districts), [placements, city.districts])
@@ -74,7 +75,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const layer = LAYERS.find((l) => l.sphere === sphere) ?? LAYERS[0]
   const metric = city.metrics.find((m) => m.key === layer.metric) ?? city.metrics[0]
   const baseValues = valuesById(city.districts)
-  const selectedId = view.mode === 'explore' || view.mode === 'ai' || view.mode === 'build' ? null : view.districtId
+  const selectedId = view.mode === 'build' ? solving?.district_id ?? null : view.mode === 'explore' || view.mode === 'ai' ? null : view.districtId
   const district = city.districts.find((d) => d.id === selectedId)
 
   function selectDistrict(id: number) {
@@ -130,17 +131,28 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   // Анимация «до → после» — только для SIMULATE: в конструкторе значения меняются на ходу
   const mapValues = useTweenedValues(isResult ? ghostValues : null, shownValues)
 
+  function solveInBuilder(complaint: Complaint) {
+    const key = suggestedObject(complaint.category)
+    setPlacements([])
+    setTool(objects.find((o) => o.key === key)?.id ?? null)
+    setSolving(complaint)
+    setView({ mode: 'build' })
+  }
+
   function leaveBuild() {
     setPlacements([])
     setTool(null)
+    setSolving(null)
     setView({ mode: 'explore' })
   }
 
   async function saveBuild(name: string) {
     const home = placements[0] && districtAt(city.districts, placements[0])
     if (!home) return
-    const data = await createScenario({ name, district_id: home.id, items: buildItems(placements) })
+    const data = await createScenario({ name, district_id: home.id, items: buildItems(placements), complaint_ids: solving ? [solving.id] : undefined })
     setScenariosVersion((v) => v + 1)
+    setSolving(null)
+    feed.refresh() // жалоба стала «принята» — обновляем ленту сразу
     setPlacements([])
     setTool(null)
     setView({ mode: 'result', districtId: home.id, data })
@@ -193,7 +205,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
         markers: placements.map((p) => {
           const object = objects.find((o) => o.id === p.actionId)
           const name = object?.name ?? 'Объект'
-          return { uid: p.uid, lat: p.lat, lng: p.lng, radiusM: object?.radius_m ?? 0, label: name.charAt(0), name, invalid: placeProblems.has(p.uid) }
+          return { uid: p.uid, lat: p.lat, lng: p.lng, radiusM: object?.radius_m ?? 0, label: name.charAt(0), name, kind: object?.key ?? '', invalid: placeProblems.has(p.uid) }
         }),
         onMove: (uid, point, onBuilding) => setPlacements((current) => current.map((p) => (p.uid === uid ? { ...p, ...point, onBuilding } : p))),
       } : null}
@@ -214,6 +226,8 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       onRemove={(uid) => setPlacements((current) => current.filter((p) => p.uid !== uid))}
       onSave={saveBuild}
       onExit={leaveBuild}
+      complaint={solving ? { text: solving.text, district: city.districts.find((d) => d.id === solving.district_id)?.name ?? 'район' } : null}
+      onDropComplaint={() => setSolving(null)}
     />
   ) : view.mode === 'draw' && district ? (
     <DrawPanel
@@ -245,7 +259,7 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       onClose={() => setView({ mode: 'explore' })}
       onDrawRoute={startDrawing}
     >
-      <DistrictComplaints complaints={feed.complaints.filter((c) => c.district_id === district.id)} onStatus={moderate} />
+      <DistrictComplaints complaints={feed.complaints.filter((c) => c.district_id === district.id)} onStatus={moderate} onSolve={solveInBuilder} />
     </DistrictPanel>
   ) : null
 

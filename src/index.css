@@ -20,6 +20,12 @@
 
   --route: #2952cc;
   --route-soft: #e6ecfb;
+  /* Объекты конструктора на карте */
+  --object-school: #5b6ee1;
+  --object-kindergarten: #a16ae8;
+  --object-clinic: #e9eef2;
+  --object-park: #3fa45b;
+  --object-stop: #2952cc;
 
   --radius: 1rem;
   --shadow: 0 0.5rem 1.5rem rgb(22 35 46 / 0.08);

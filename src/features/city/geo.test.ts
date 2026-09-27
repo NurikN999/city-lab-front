@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Metric } from '../../shared/lib/schemas'
-import { alertCollections, buildZoneCollection, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
+import { alertCollections, buildObjectCollection, buildZoneCollection, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
 
 const traffic: Metric = { key: 'traffic', name: 'Загрузка дорог', unit: '%', sphere: 'transport', lower_is_better: true, min: 0, max: 100, is_computed: false }
 
@@ -113,5 +113,19 @@ describe('geo', () => {
     const ring = fc.features[0].geometry.coordinates[0]
     expect(metersBetween(ring[0], [51.16, 43.66])).toBeGreaterThan(480)
     expect(metersBetween(ring[0], [51.16, 43.66])).toBeLessThan(520)
+  })
+
+  it('raises a building of the right size for each placed object', () => {
+    const [school, stop] = buildObjectCollection([
+      { uid: 1, lat: 43.66, lng: 51.16, kind: 'school', invalid: false, grow: 0.5 },
+      { uid: 2, lat: 43.66, lng: 51.17, kind: 'bus_stop', invalid: true, grow: 1 },
+    ]).features
+    const ring = school.geometry.coordinates[0]
+
+    expect(metersBetween(ring[0], ring[1])).toBeGreaterThan(115)
+    expect(metersBetween(ring[0], ring[1])).toBeLessThan(125)
+    expect(school.properties).toEqual({ uid: 1, kind: 'school', invalid: false, height: 22.5 }) // половина из 45 м — ещё растёт
+    expect(stop.properties.height).toBe(12)
+    expect(stop.properties.invalid).toBe(true)
   })
 })

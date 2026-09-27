@@ -22,3 +22,8 @@ export function timeAgo(iso: string, now = Date.now()): string {
   if (minutes < 60) return `${minutes} мин назад`
   return `${Math.floor(minutes / 60)} ч назад`
 }
+
+/** Каким объектом конструктора можно ответить на жалобу; null — подходящего объекта пока нет. */
+export function suggestedObject(category: ComplaintCategory): string | null {
+  return { transport: 'bus_stop', climate: 'park', social: 'clinic', water: null, other: null }[category]
+}

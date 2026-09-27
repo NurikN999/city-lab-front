@@ -193,6 +193,8 @@ export const complaintSchema = z.object({
   category: complaintCategorySchema,
   text: z.string(),
   status: z.enum(['new', 'accepted', 'resolved', 'hidden']),
+  scenario_id: z.number().nullable().optional(), // сценарий, которым жалоба принята в работу
+  scenario_name: z.string().nullable().optional(),
   created_at: z.string(),
 })
 export type Complaint = z.infer<typeof complaintSchema>

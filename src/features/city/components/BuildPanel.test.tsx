@@ -46,4 +46,13 @@ describe('BuildPanel', () => {
 
     expect(props.onSave).toHaveBeenCalledWith('Конструктор: Школа')
   })
+
+  it('reminds which complaint the builder is solving', async () => {
+    const onDropComplaint = vi.fn()
+    renderPanel({ complaint: { text: 'Далеко до поликлиники', district: '14 мкр' }, onDropComplaint })
+
+    expect(screen.getByText(/Решаем жалобу · 14 мкр/)).toHaveTextContent('Далеко до поликлиники')
+    await userEvent.click(screen.getByRole('button', { name: 'Не привязывать к жалобе' }))
+    expect(onDropComplaint).toHaveBeenCalled()
+  })
 })

@@ -20,10 +20,12 @@ type BuildPanelProps = {
   onRemove: (uid: number) => void
   onSave: (name: string) => Promise<void>
   onExit: () => void
+  complaint?: { text: string; district: string } | null // жалоба, которую решаем этим сценарием
+  onDropComplaint?: () => void
 }
 
 export function BuildPanel(props: BuildPanelProps) {
-  const { objects, metrics, districts, placements, problems, tool, result, error, onTool, onRemove, onSave, onExit } = props
+  const { objects, metrics, districts, placements, problems, tool, result, error, onTool, onRemove, onSave, onExit, complaint, onDropComplaint } = props
   const cost = buildCost(placements, objects)
   const suggested = placements.length > 0 ? buildName(placements, objects) : ''
   // Своё название, пока пользователь его не менял, следует за набором объектов
@@ -51,6 +53,12 @@ export function BuildPanel(props: BuildPanelProps) {
         <h2 id="build-title" className={styles.title}>Конструктор</h2>
         <button type="button" className={styles.remove} aria-label="Выйти из конструктора" onClick={onExit}>×</button>
       </div>
+      {complaint && (
+        <div className={build.complaint}>
+          <p>Решаем жалобу · {complaint.district}: «{complaint.text}»</p>
+          <button type="button" className={styles.remove} aria-label="Не привязывать к жалобе" onClick={onDropComplaint}>×</button>
+        </div>
+      )}
       <p className={styles.hint}>
         {toolName ? `Кликните по карте, чтобы поставить «${toolName}».` : 'Выберите объект и кликните по карте. Поставленные объекты можно перетаскивать.'}
       </p>

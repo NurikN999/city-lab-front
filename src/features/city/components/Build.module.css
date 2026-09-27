@@ -101,3 +101,18 @@
   display: grid;
   gap: 0.5rem;
 }
+
+.complaint {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--bad-soft);
+  font-size: 0.875rem;
+}
+
+.complaint p {
+  margin: 0;
+}
