@@ -31,7 +31,11 @@ export function BuildPanel(props: BuildPanelProps) {
   // Своё название, пока пользователь его не менял, следует за набором объектов
   const [customName, setCustomName] = useState<string | null>(null)
   const name = customName ?? suggested
-  const toolName = objects.find((o) => o.id === tool)?.name
+  const toolAction = objects.find((o) => o.id === tool)
+  const toolHint = !toolAction ? 'Выберите объект и кликните по карте. Поставленные объекты можно перетаскивать.'
+    : toolAction.scope === 'line' ? 'Кликните по улице, чтобы расширить её. Повторный клик — отменить.'
+    : toolAction.scope === 'building' ? 'Кликните по зданию, чтобы снести его и освободить место. Повторный клик — отменить.'
+    : `Кликните по карте, чтобы поставить «${toolAction.name}».`
 
   const [saveError, save, isSaving] = useActionState(async () => {
     try {
@@ -59,16 +63,14 @@ export function BuildPanel(props: BuildPanelProps) {
           <button type="button" className={styles.remove} aria-label="Не привязывать к жалобе" onClick={onDropComplaint}>×</button>
         </div>
       )}
-      <p className={styles.hint}>
-        {toolName ? `Кликните по карте, чтобы поставить «${toolName}».` : 'Выберите объект и кликните по карте. Поставленные объекты можно перетаскивать.'}
-      </p>
+      <p className={styles.hint}>{toolHint}</p>
 
       <ul className={build.palette}>
         {objects.map((o) => (
           <li key={o.id}>
             <button type="button" className={build.object} aria-pressed={tool === o.id} onClick={() => onTool(tool === o.id ? null : o.id)}>
               <span className={build.objectName}>{o.name}</span>
-              <span className={build.objectMeta}>{formatMoney(o.cost)} · {o.radius_m ?? 0} м</span>
+              <span className={build.objectMeta}>{formatMoney(o.cost)}{o.radius_m ? ` · ${o.radius_m} м` : ''}</span>
             </button>
           </li>
         ))}
@@ -82,7 +84,7 @@ export function BuildPanel(props: BuildPanelProps) {
             return (
               <li key={p.uid} className={build.placedRow}>
                 <span>
-                  <strong>{object?.name}</strong> · {districtAt(districts, p)?.name ?? 'вне районов'}
+                  <strong>{object?.name}</strong> · {p.kind === 'road' ? p.label : districtAt(districts, p)?.name ?? 'вне районов'}
                   {problem && <span className={build.problem}>{problem}</span>}
                 </span>
                 <button type="button" className={styles.remove} aria-label={`Убрать «${object?.name}»`} onClick={() => onRemove(p.uid)}>×</button>

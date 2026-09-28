@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Metric } from '../../shared/lib/schemas'
-import { alertCollections, buildObjectCollection, buildZoneCollection, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
+import { alertCollections, buildObjectCollection, collectLines, buildZoneCollection, busCollection, circlePolygon, columnCollection, ghostCollection, districtCollection, labelCollection, lineCollection, numberedStops, pointAlong, routeCollection } from './geo'
 
 const traffic: Metric = { key: 'traffic', name: 'Загрузка дорог', unit: '%', sphere: 'transport', lower_is_better: true, min: 0, max: 100, is_computed: false }
 
@@ -127,5 +127,25 @@ describe('geo', () => {
     expect(school.properties).toEqual({ uid: 1, kind: 'school', invalid: false, height: 22.5 }) // половина из 45 м — ещё растёт
     expect(stop.properties.height).toBe(12)
     expect(stop.properties.invalid).toBe(true)
+  })
+
+  it('merges street pieces from tiles without duplicates', () => {
+    const piece: [number, number][] = [[51.16, 43.66], [51.165, 43.66]]
+    const lines = collectLines([
+      { type: 'LineString', coordinates: piece },
+      { type: 'LineString', coordinates: piece }, // тот же кусок из соседнего тайла
+      { type: 'MultiLineString', coordinates: [[[51.165, 43.66], [51.17, 43.66]]] },
+    ])
+
+    expect(lines).toEqual([piece, [[51.165, 43.66], [51.17, 43.66]]])
+  })
+
+  it('thins a very long street to the API limit', () => {
+    const long: [number, number][] = Array.from({ length: 5000 }, (_, i) => [51.1 + i / 100_000, 43.66])
+    const lines = collectLines([{ type: 'LineString', coordinates: long }])
+
+    expect(lines.flat().length).toBeLessThanOrEqual(2000)
+    expect(lines[0][0]).toEqual(long[0])
+    expect(lines[0].at(-1)).toEqual(long.at(-1))
   })
 })

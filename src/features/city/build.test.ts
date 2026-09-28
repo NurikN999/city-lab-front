@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Action, District, Metric, SimulationResult } from '../../shared/lib/schemas'
-import { buildCost, buildItems, buildName, districtAt, placementProblems, topDistrictChanges, type Placement } from './build'
+import { buildCost, buildItems, buildName, districtAt, placementProblems, roadLabel, topDistrictChanges, type Placement } from './build'
 
 const square = (lng: number, lat: number): District['boundary'] => ({
   type: 'Polygon',
@@ -61,5 +61,37 @@ describe('city builder', () => {
     expect(topDistrictChanges(result, metrics, districts)).toEqual([
       { district: '12 мкр', metric: 'Доступность соцобъектов', delta: 9.9, improved: true },
     ])
+  })
+
+  describe('roads and demolition', () => {
+    const tool = (id: number, key: string, name: string, cost: number, scope: 'line' | 'building'): Action => ({
+      id, key, name, sphere, cost, scope, radius_m: scope === 'line' ? 400 : null, assumption: '', source_url: null, effects: [],
+    })
+    const tools = [...actions, tool(30, 'road_widening', 'Расширение дороги', 60_000_000, 'line'), tool(31, 'demolish', 'Снос здания', 8_000_000, 'building')]
+    const lines: [number, number][][] = [[[51.16, 43.66], [51.17, 43.66]]]
+    const road: Placement = { kind: 'road', uid: 7, actionId: 30, osmId: 1812380470, label: 'Улица районного значения', lines }
+    const demolition: Placement = { kind: 'demolish', uid: 8, actionId: 31, osmId: 3275346630, lat: 43.7, lng: 51.3, footprint: [] }
+
+    it('sends a street line and a building id to the API', () => {
+      expect(buildItems([road, demolition])).toEqual([
+        { action_id: 30, geometry: { type: 'MultiLineString', coordinates: lines } },
+        { action_id: 31, osm_id: 3275346630, lat: 43.7, lng: 51.3 },
+      ])
+    })
+
+    it('checks the spot only for new objects', () => {
+      expect(placementProblems([road, demolition], districts).size).toBe(0)
+    })
+
+    it('prices and names every kind of change', () => {
+      const all = [place(1, 21, 43.66, 51.16), road, demolition, { ...demolition, uid: 9 }]
+      expect(buildCost(all, tools)).toBe(91_000_000)
+      expect(buildName(all, tools)).toBe('Конструктор: Сквер + Расширение дороги + Снос здания ×2')
+    })
+
+    it('names a street by its class', () => {
+      expect(roadLabel('secondary')).toBe('Улица районного значения')
+      expect(roadLabel('track')).toBe('Дорога')
+    })
   })
 })

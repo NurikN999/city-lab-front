@@ -234,3 +234,28 @@ export function buildObjectCollection(
     }
   }))
 }
+
+const MAX_LINE_POINTS = 2000 // лимит API для линии улицы
+
+type LineGeometry = { type: 'LineString'; coordinates: number[][] } | { type: 'MultiLineString'; coordinates: number[][][] }
+
+/** Линия улицы из кусков тайлов: без дублей (кусок повторяется в соседних тайлах) и не длиннее лимита API. */
+export function collectLines(geometries: LineGeometry[]): [number, number][][] {
+  const seen = new Set<string>()
+  const lines: [number, number][][] = []
+  for (const g of geometries) {
+    for (const line of g.type === 'LineString' ? [g.coordinates] : g.coordinates) {
+      const points = line.map(([lng, lat]): [number, number] => [lng, lat])
+      const key = JSON.stringify(points)
+      if (points.length >= 2 && !seen.has(key)) {
+        seen.add(key)
+        lines.push(points)
+      }
+    }
+  }
+  const total = lines.reduce((sum, line) => sum + line.length, 0)
+  if (total <= MAX_LINE_POINTS) return lines
+  // Прореживаем каждую линию равномерно, сохраняя концы
+  const step = Math.ceil(total / MAX_LINE_POINTS)
+  return lines.map((line) => line.filter((_, i) => i % step === 0 || i === line.length - 1))
+}

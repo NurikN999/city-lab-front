@@ -2,8 +2,22 @@ import { isImprovement } from '../../shared/lib/format'
 import type { Action, District, LatLng, Metric, ScenarioItemInput, SimulationResult } from '../../shared/lib/schemas'
 import { pathLengthKm } from './drawing'
 
-/** Объект конструктора на карте. onBuilding — место занято зданием (проверяет карта). */
-export type Placement = { uid: number; actionId: number; lat: number; lng: number; onBuilding: boolean }
+/** Новый объект на карте. onBuilding — место занято зданием (проверяет карта). */
+export type ObjectPlacement = { kind?: 'object'; uid: number; actionId: number; lat: number; lng: number; onBuilding: boolean }
+/** Расширенная улица: линия собрана из тайлов по id дороги в OSM. */
+export type RoadEdit = { kind: 'road'; uid: number; actionId: number; osmId: number; label: string; lines: [number, number][][] }
+/** Снесённое здание: id в OSM, центр и контур для «пятна» на карте. */
+export type Demolition = { kind: 'demolish'; uid: number; actionId: number; osmId: number; lat: number; lng: number; footprint: [number, number][][] }
+export type Placement = ObjectPlacement | RoadEdit | Demolition
+
+export const isObject = (p: Placement): p is ObjectPlacement => p.kind === undefined || p.kind === 'object'
+
+const ROAD_LABELS: Record<string, string> = {
+  motorway: 'Магистраль', trunk: 'Магистраль', primary: 'Магистральная улица',
+  secondary: 'Улица районного значения', tertiary: 'Улица', minor: 'Местная улица', service: 'Проезд',
+}
+
+export const roadLabel = (cls: string) => ROAD_LABELS[cls] ?? 'Дорога'
 
 const MIN_SAME_GAP_M = 300
 
@@ -26,10 +40,11 @@ export function districtAt(districts: District[], point: LatLng): District | und
 /** Почему место не подходит: uid → причина. Пустая карта — всё можно строить. */
 export function placementProblems(placements: Placement[], districts: District[]): Map<number, string> {
   const problems = new Map<number, string>()
-  for (const p of placements) {
+  const objects = placements.filter(isObject) // дорога и снос — поверх существующего, место не проверяем
+  for (const p of objects) {
     if (!districtAt(districts, p)) problems.set(p.uid, 'Вне жилых районов')
     else if (p.onBuilding) problems.set(p.uid, 'На месте уже стоит здание')
-    else if (placements.some((o) => o.uid !== p.uid && o.actionId === p.actionId && metersBetween(o, p) < MIN_SAME_GAP_M)) {
+    else if (objects.some((o) => o.uid !== p.uid && o.actionId === p.actionId && metersBetween(o, p) < MIN_SAME_GAP_M)) {
       problems.set(p.uid, `Ближе ${MIN_SAME_GAP_M} м к такому же объекту`)
     }
   }
@@ -37,7 +52,11 @@ export function placementProblems(placements: Placement[], districts: District[]
 }
 
 export function buildItems(placements: Placement[]): ScenarioItemInput[] {
-  return placements.map((p) => ({ action_id: p.actionId, lat: p.lat, lng: p.lng }))
+  return placements.map((p) => {
+    if (p.kind === 'road') return { action_id: p.actionId, geometry: { type: 'MultiLineString' as const, coordinates: p.lines } }
+    if (p.kind === 'demolish') return { action_id: p.actionId, osm_id: p.osmId, lat: p.lat, lng: p.lng }
+    return { action_id: p.actionId, lat: p.lat, lng: p.lng }
+  })
 }
 
 export function buildCost(placements: Placement[], actions: Action[]): number {

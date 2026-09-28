@@ -55,4 +55,22 @@ describe('BuildPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Не привязывать к жалобе' }))
     expect(onDropComplaint).toHaveBeenCalled()
   })
+
+  it('lists widened streets and demolished buildings', () => {
+    const road: Action = { ...school, id: 30, key: 'road_widening', name: 'Расширение дороги', cost: 60_000_000, scope: 'line', radius_m: 400 }
+    const demolish: Action = { ...school, id: 31, key: 'demolish', name: 'Снос здания', cost: 8_000_000, scope: 'building', radius_m: null }
+    renderPanel({
+      objects: [school, road, demolish],
+      placements: [
+        { kind: 'road', uid: 2, actionId: 30, osmId: 1, label: 'Улица районного значения', lines: [[[51.16, 43.66], [51.17, 43.66]]] },
+        { kind: 'demolish', uid: 3, actionId: 31, osmId: 2, lat: 43.66, lng: 51.16, footprint: [] },
+      ],
+    })
+
+    expect(screen.getByText('Снос здания', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Поставленные объекты' })).toHaveTextContent('Расширение дороги · Улица районного значения')
+    expect(screen.getByRole('list', { name: 'Поставленные объекты' })).toHaveTextContent('Снос здания · 12 мкр')
+    expect(screen.getByRole('button', { name: /^Снос здания/ })).toHaveTextContent('8 млн ₸')
+    expect(screen.getByRole('button', { name: /^Снос здания/ })).not.toHaveTextContent('м ·')
+  })
 })

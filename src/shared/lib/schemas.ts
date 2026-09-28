@@ -61,7 +61,7 @@ export const actionSchema = z.object({
   name: z.string(),
   sphere: sphereSchema,
   cost: z.number(),
-  scope: z.enum(['district', 'route', 'point']), // point — объект конструктора на карте
+  scope: z.enum(['district', 'route', 'point', 'line', 'building']), // point — объект, line — расширение дороги, building — снос
   radius_m: z.number().nullable().optional(),
   assumption: z.string(),
   source_url: z.string().nullable(),
@@ -184,6 +184,8 @@ export type ScenarioItemInput =
   | { action_id: number; district_id: number }
   | { action_id: number; route_id: number }
   | { action_id: number; lat: number; lng: number }
+  | { action_id: number; geometry: { type: 'MultiLineString'; coordinates: [number, number][][] } }
+  | { action_id: number; osm_id: number; lat: number; lng: number }
 
 export const complaintCategorySchema = z.enum(['transport', 'climate', 'water', 'social', 'other'])
 export type ComplaintCategory = z.infer<typeof complaintCategorySchema>
