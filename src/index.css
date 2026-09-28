@@ -20,6 +20,7 @@
 
   --route: #2952cc;
   --route-soft: #e6ecfb;
+  --building: #ddd8cf; /* здания Актау в конструкторе — в тон подложке */
   /* Объекты конструктора на карте */
   --object-school: #5b6ee1;
   --object-kindergarten: #a16ae8;

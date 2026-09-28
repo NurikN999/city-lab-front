@@ -23,6 +23,9 @@ const ALERT_PULSE_MS = 1600
 // Отметка жалоб над подписью района, а не поверх неё
 const ALERT_OFFSET: [number, number] = [0, -42]
 const GROW_MS = 700 // объект конструктора «вырастает» из земли
+// В тайлах соседние дома склеены в одну фигуру с общим id — для сноса нужны здания поштучно (scripts/fetch-buildings.mjs)
+const BUILDINGS_URL = `${import.meta.env.BASE_URL}data/aktau-buildings.geojson`
+const OSM_BUILDINGS = 'osm-buildings-3d'
 
 type CityMapProps = {
   districts: District[]
@@ -63,7 +66,7 @@ const layersOf = (map: MapLibreMap, sourceLayer: string, type?: string) =>
 
 function pickAt(map: MapLibreMap, pixel: PointLike): MapHit {
   const [x, y] = Array.isArray(pixel) ? pixel : [pixel.x, pixel.y]
-  const buildingFeature = map.queryRenderedFeatures(pixel, { layers: layersOf(map, 'building') })[0]
+  const buildingFeature = map.queryRenderedFeatures(pixel, { layers: [OSM_BUILDINGS] })[0]
   const roadLayers = layersOf(map, 'transportation', 'line').filter((id) => !id.includes('casing') && !id.includes('rail') && !id.includes('path'))
   const roadFeature = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: roadLayers })
     .find((f) => EDITABLE_ROADS.has(String(f.properties.class)))
@@ -99,8 +102,7 @@ function pickAt(map: MapLibreMap, pixel: PointLike): MapHit {
 }
 
 function onBuildingAt(map: MapLibreMap, lngLat: LngLat): boolean {
-  const layers = map.getStyle().layers.flatMap((l) => ('source-layer' in l && l['source-layer'] === 'building' ? [l.id] : []))
-  return layers.length > 0 && map.queryRenderedFeatures(map.project(lngLat), { layers }).length > 0
+  return map.queryRenderedFeatures(map.project(lngLat), { layers: [OSM_BUILDINGS] }).length > 0
 }
 
 function cssVar(name: string): string {
@@ -111,9 +113,13 @@ function addLayers(map: MapLibreMap) {
   const [good, mid, bad, route, accent, surface, text] = ['--good', '--mid', '--bad', '--route', '--accent', '--surface', '--text'].map(cssVar)
   const byLevel: ExpressionSpecification = ['match', ['get', 'level'], 'good', good, 'mid', mid, bad]
 
-  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones', 'build-objects', 'build-roads', 'build-demolished']) {
+  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones', 'build-objects', 'build-roads', 'build-demolished', 'osm-buildings']) {
     map.addSource(id, { type: 'geojson', data: EMPTY })
   }
+  map.addLayer({
+    id: OSM_BUILDINGS, type: 'fill-extrusion', source: 'osm-buildings', layout: { visibility: 'none' },
+    paint: { 'fill-extrusion-color': cssVar('--building'), 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-opacity': 0.9 },
+  })
   map.addLayer({ id: 'district-fill', type: 'fill', source: 'districts', paint: { 'fill-color': byLevel, 'fill-opacity': 0.3 } })
   map.addLayer({
     id: 'district-line', type: 'line', source: 'districts',
@@ -314,10 +320,23 @@ export function CityMap(props: CityMapProps) {
       type: 'FeatureCollection',
       features: (demolished ?? []).map((d) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: d.footprint }, properties: { osmId: d.osmId } })),
     })
-    // Снесённые здания исчезают из подложки; проверка «на здании» их тоже больше не видит
+    // Снесённые здания исчезают; проверка «на здании» их тоже больше не видит
     const ids = (demolished ?? []).map((d) => d.osmId)
-    for (const id of layersOf(map, 'building')) map.setFilter(id, ids.length > 0 ? ['!', ['in', ['id'], ['literal', ids]]] : null)
+    map.setFilter(OSM_BUILDINGS, ids.length > 0 ? ['!', ['in', ['id'], ['literal', ids]]] : null)
   }, [map, buildRoads, demolished])
+
+  // Конструктор показывает здания поштучно вместо тайловых групп; файл грузится при первом входе
+  const buildMode = building !== null
+  const buildingsRequested = useRef(false)
+  useEffect(() => {
+    if (!map) return
+    if (buildMode && !buildingsRequested.current) {
+      map.getSource<GeoJSONSource>('osm-buildings')?.setData(BUILDINGS_URL)
+      buildingsRequested.current = true
+    }
+    map.setLayoutProperty(OSM_BUILDINGS, 'visibility', buildMode ? 'visible' : 'none')
+    for (const id of layersOf(map, 'building')) map.setLayoutProperty(id, 'visibility', buildMode ? 'none' : 'visible')
+  }, [map, buildMode])
 
   const bornRef = useRef(new Map<number, number>())
   useEffect(() => {
