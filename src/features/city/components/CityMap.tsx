@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type LngLat } from 'maplibre-gl'
+import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type LngLat, type PointLike } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { District, LatLng, Metric, MetricValues } from '../../../shared/lib/schemas'
 import {
-  alertCollections, buildObjectCollection, buildZoneCollection, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
+  alertCollections, buildObjectCollection, buildZoneCollection, collectLines, busCollection, columnCollection, coverageCollection, districtCollection, EMPTY, ghostCollection,
   labelCollection, lineCollection, numberedStops, routeCollection, type DistrictAlert, stopCollection, type RouteLayer,
 } from '../geo'
 import { snapHeight, type Snap } from '../sheet'
@@ -35,15 +35,69 @@ type CityMapProps = {
   animateBuses: boolean
   onSelectDistrict: (id: number) => void
   drawing: { points: LatLng[]; path: [number, number][] | null } | null
-  onMapClick: (point: LatLng, onBuilding: boolean) => void
+  onMapClick: (point: LatLng, hit: MapHit) => void
   sheetSnap?: Snap // на телефоне: карта центрирует выбранное над шторкой
   alerts: DistrictAlert[] // районы с активными жалобами жителей
-  building: { markers: BuildMarker[]; onMove: (uid: number, point: LatLng, onBuilding: boolean) => void } | null // конструктор
+  building: {
+    markers: BuildMarker[]
+    onMove: (uid: number, point: LatLng, onBuilding: boolean) => void
+    roads: { uid: number; lines: [number, number][][] }[] // расширенные улицы
+    demolished: { osmId: number; footprint: [number, number][][] }[] // снесённые здания
+  } | null // конструктор
 }
 
 export type BuildMarker = { uid: number; lat: number; lng: number; radiusM: number; label: string; name: string; kind: string; invalid: boolean }
 
 /** Стоит ли точка на здании — по слою зданий самой подложки. */
+/** Что под курсором: здание (id, контур, центр) и/или улица (id, класс, полная линия из тайлов). */
+export type MapHit = {
+  onBuilding: boolean
+  building: { osmId: number; lat: number; lng: number; footprint: [number, number][][] } | null
+  road: { osmId: number; cls: string; lines: [number, number][][] } | null
+}
+
+const EDITABLE_ROADS = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor'])
+
+const layersOf = (map: MapLibreMap, sourceLayer: string, type?: string) =>
+  map.getStyle().layers.flatMap((l) => ('source-layer' in l && l['source-layer'] === sourceLayer && (!type || l.type === type) ? [l.id] : []))
+
+function pickAt(map: MapLibreMap, pixel: PointLike): MapHit {
+  const [x, y] = Array.isArray(pixel) ? pixel : [pixel.x, pixel.y]
+  const buildingFeature = map.queryRenderedFeatures(pixel, { layers: layersOf(map, 'building') })[0]
+  const roadLayers = layersOf(map, 'transportation', 'line').filter((id) => !id.includes('casing') && !id.includes('rail') && !id.includes('path'))
+  const roadFeature = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: roadLayers })
+    .find((f) => EDITABLE_ROADS.has(String(f.properties.class)))
+
+  let building: MapHit['building'] = null
+  if (buildingFeature && typeof buildingFeature.id === 'number') {
+    const g = buildingFeature.geometry
+    const rings = g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates[0] : []
+    const outer = rings[0] ?? []
+    if (outer.length > 0) {
+      building = {
+        osmId: buildingFeature.id,
+        lng: outer.reduce((sum, p) => sum + p[0], 0) / outer.length,
+        lat: outer.reduce((sum, p) => sum + p[1], 0) / outer.length,
+        footprint: rings.map((ring) => ring.map(([lng, lat]): [number, number] => [lng, lat])),
+      }
+    }
+  }
+
+  let road: MapHit['road'] = null
+  if (roadFeature && typeof roadFeature.id === 'number') {
+    // Улица в тайлах порезана на куски — собираем отрисованные сейчас куски с тем же id
+    // (только текущий масштаб: в источнике лежат и тайлы других масштабов, они дублировали бы линию)
+    const pieces = map.queryRenderedFeatures({ layers: roadLayers, filter: ['==', ['id'], roadFeature.id] })
+    road = {
+      osmId: roadFeature.id,
+      cls: String(roadFeature.properties.class),
+      lines: collectLines(pieces.flatMap((f) => (f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString' ? [f.geometry] : []))),
+    }
+  }
+
+  return { onBuilding: building !== null, building, road }
+}
+
 function onBuildingAt(map: MapLibreMap, lngLat: LngLat): boolean {
   const layers = map.getStyle().layers.flatMap((l) => ('source-layer' in l && l['source-layer'] === 'building' ? [l.id] : []))
   return layers.length > 0 && map.queryRenderedFeatures(map.project(lngLat), { layers }).length > 0
@@ -57,7 +111,7 @@ function addLayers(map: MapLibreMap) {
   const [good, mid, bad, route, accent, surface, text] = ['--good', '--mid', '--bad', '--route', '--accent', '--surface', '--text'].map(cssVar)
   const byLevel: ExpressionSpecification = ['match', ['get', 'level'], 'good', good, 'mid', mid, bad]
 
-  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones', 'build-objects']) {
+  for (const id of ['districts', 'labels', 'columns', 'ghosts', 'coverage', 'routes', 'stops', 'buses', 'draft-path', 'draft-stops', 'alert-areas', 'alert-points', 'build-zones', 'build-objects', 'build-roads', 'build-demolished']) {
     map.addSource(id, { type: 'geojson', data: EMPTY })
   }
   map.addLayer({ id: 'district-fill', type: 'fill', source: 'districts', paint: { 'fill-color': byLevel, 'fill-opacity': 0.3 } })
@@ -134,6 +188,12 @@ function addLayers(map: MapLibreMap) {
     'school', cssVar('--object-school'), 'kindergarten', cssVar('--object-kindergarten'), 'clinic', cssVar('--object-clinic'),
     'park', cssVar('--object-park'), 'bus_stop', cssVar('--object-stop'), route]]
   map.addLayer({ id: 'build-objects', type: 'fill-extrusion', source: 'build-objects', paint: { 'fill-extrusion-color': byKind, 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.95 } })
+  // Правки города: снесённые здания — серое пятно, расширенная улица — широкая линия с разметкой новых полос
+  map.addLayer({ id: 'build-demolished-fill', type: 'fill', source: 'build-demolished', paint: { 'fill-color': cssVar('--muted'), 'fill-opacity': 0.45 } }, 'coverage')
+  map.addLayer({ id: 'build-demolished-line', type: 'line', source: 'build-demolished', paint: { 'line-color': text, 'line-width': 1.5, 'line-dasharray': [2, 2] } }, 'coverage')
+  map.addLayer({ id: 'build-road-casing', type: 'line', source: 'build-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': surface, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 26] } }, 'coverage')
+  map.addLayer({ id: 'build-road', type: 'line', source: 'build-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': route, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 20] } }, 'coverage')
+  map.addLayer({ id: 'build-road-lanes', type: 'line', source: 'build-roads', paint: { 'line-color': surface, 'line-width': 1.5, 'line-dasharray': [3, 3] } }, 'coverage')
 }
 
 export function CityMap(props: CityMapProps) {
@@ -175,7 +235,7 @@ export function CityMap(props: CityMapProps) {
     instance.on('load', () => {
       addLayers(instance)
       instance.on('click', (event) => {
-        if (isDrawingRef.current) onMapClickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng }, onBuildingAt(instance, event.lngLat))
+        if (isDrawingRef.current) onMapClickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng }, pickAt(instance, event.point))
       })
       instance.on('click', 'district-fill', (event) => {
         if (isDrawingRef.current) return
@@ -241,6 +301,23 @@ export function CityMap(props: CityMapProps) {
     if (!map) return
     map.getSource<GeoJSONSource>('build-zones')?.setData(buildZoneCollection(buildMarkers ?? []))
   }, [map, buildMarkers])
+
+  const buildRoads = building?.roads
+  const demolished = building?.demolished
+  useEffect(() => {
+    if (!map) return
+    map.getSource<GeoJSONSource>('build-roads')?.setData({
+      type: 'FeatureCollection',
+      features: (buildRoads ?? []).map((r) => ({ type: 'Feature', geometry: { type: 'MultiLineString', coordinates: r.lines }, properties: { uid: r.uid } })),
+    })
+    map.getSource<GeoJSONSource>('build-demolished')?.setData({
+      type: 'FeatureCollection',
+      features: (demolished ?? []).map((d) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: d.footprint }, properties: { osmId: d.osmId } })),
+    })
+    // Снесённые здания исчезают из подложки; проверка «на здании» их тоже больше не видит
+    const ids = (demolished ?? []).map((d) => d.osmId)
+    for (const id of layersOf(map, 'building')) map.setFilter(id, ids.length > 0 ? ['!', ['in', ['id'], ['literal', ids]]] : null)
+  }, [map, buildRoads, demolished])
 
   const bornRef = useRef(new Map<number, number>())
   useEffect(() => {

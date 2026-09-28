@@ -2,11 +2,11 @@ import { useMemo, useRef, useState } from 'react'
 import { DEFAULT_BUDGET } from '../../shared/lib/format'
 import type { Action, BusRoute, CityResponse, Complaint, LatLng, MetricValues } from '../../shared/lib/schemas'
 import { createScenario } from './api'
-import { buildItems, districtAt, placementProblems, type Placement } from './build'
+import { buildItems, districtAt, isObject, placementProblems, roadLabel, type Placement } from './build'
 import { AiBar } from './components/AiBar'
 import { AiResults } from './components/AiResults'
 import { CityKpiPanel } from './components/CityKpiPanel'
-import { CityMap } from './components/CityMap'
+import { CityMap, type MapHit } from './components/CityMap'
 import { DistrictPanel } from './components/DistrictPanel'
 import { DrawPanel } from './components/DrawPanel'
 import { FloatingPanel } from './components/FloatingPanel'
@@ -56,8 +56,13 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   const [tool, setTool] = useState<number | null>(null)
   const [solving, setSolving] = useState<Complaint | null>(null) // жалоба, которую решаем в конструкторе
   const nextUid = useRef(1)
-  const objects = actions.filter((a) => a.scope === 'point')
+  const objects = actions.filter((a) => a.scope === 'point' || a.scope === 'line' || a.scope === 'building')
   const placeProblems = useMemo(() => placementProblems(placements, city.districts), [placements, city.districts])
+  // Стабильные списки для карты: иначе она перерисовывала бы улицы и фильтр зданий на каждый кадр
+  const edits = useMemo(() => ({
+    roads: placements.flatMap((p) => (p.kind === 'road' ? [{ uid: p.uid, lines: p.lines }] : [])),
+    demolished: placements.flatMap((p) => (p.kind === 'demolish' ? [{ osmId: p.osmId, footprint: p.footprint }] : [])),
+  }), [placements])
   const preview = useBuildPreview(view.mode === 'build' ? buildItems(placements) : [])
   const [tab, setTab] = useState<ExploreTab>('problems')
   // Положение шторки задаёт режим; ручная правка действует, пока режим не сменился
@@ -98,10 +103,27 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
     setView({ mode: 'draw', districtId: draft.districtId })
   }
 
-  function handleMapClick(point: LatLng, onBuilding: boolean) {
-    if (view.mode === 'build' && tool !== null) {
+  function handleMapClick(point: LatLng, hit: MapHit) {
+    const action = view.mode === 'build' ? objects.find((o) => o.id === tool) : undefined
+    if (action) {
       const uid = nextUid.current++
-      setPlacements((current) => [...current, { uid, actionId: tool, ...point, onBuilding }])
+      const { road, building } = hit
+      if (action.scope === 'line') {
+        // Улица: повторный клик по той же улице отменяет расширение
+        if (road) {
+          setPlacements((current) => (current.some((p) => p.kind === 'road' && p.osmId === road.osmId)
+            ? current.filter((p) => !(p.kind === 'road' && p.osmId === road.osmId))
+            : [...current, { kind: 'road', uid, actionId: action.id, osmId: road.osmId, label: roadLabel(road.cls), lines: road.lines }]))
+        }
+      } else if (action.scope === 'building') {
+        if (building) {
+          setPlacements((current) => (current.some((p) => p.kind === 'demolish' && p.osmId === building.osmId)
+            ? current.filter((p) => !(p.kind === 'demolish' && p.osmId === building.osmId))
+            : [...current, { kind: 'demolish', uid, actionId: action.id, osmId: building.osmId, lat: building.lat, lng: building.lng, footprint: building.footprint }]))
+        }
+      } else {
+        setPlacements((current) => [...current, { uid, actionId: action.id, ...point, onBuilding: hit.onBuilding }])
+      }
     }
     if (view.mode === 'draw') drawing.add(point)
   }
@@ -147,7 +169,10 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
   }
 
   async function saveBuild(name: string) {
-    const home = placements[0] && districtAt(city.districts, placements[0])
+    // Район сценария — по первой правке; у дороги — по её первой точке
+    const first = placements[0]
+    const anchor = first && (first.kind === 'road' ? { lng: first.lines[0][0][0], lat: first.lines[0][0][1] } : first)
+    const home = anchor && districtAt(city.districts, anchor)
     if (!home) return
     const data = await createScenario({ name, district_id: home.id, items: buildItems(placements), complaint_ids: solving ? [solving.id] : undefined })
     setScenariosVersion((v) => v + 1)
@@ -202,12 +227,14 @@ function CityScreen({ city, actions, routes: loadedRoutes }: CityScreenProps) {
       sheetSnap={isMobile ? snap : undefined}
       alerts={alerts}
       building={view.mode === 'build' ? {
-        markers: placements.map((p) => {
+        markers: placements.filter(isObject).map((p) => {
           const object = objects.find((o) => o.id === p.actionId)
           const name = object?.name ?? 'Объект'
           return { uid: p.uid, lat: p.lat, lng: p.lng, radiusM: object?.radius_m ?? 0, label: name.charAt(0), name, kind: object?.key ?? '', invalid: placeProblems.has(p.uid) }
         }),
-        onMove: (uid, point, onBuilding) => setPlacements((current) => current.map((p) => (p.uid === uid ? { ...p, ...point, onBuilding } : p))),
+        onMove: (uid, point, onBuilding) => setPlacements((current) => current.map((p) => (p.uid === uid && isObject(p) ? { ...p, ...point, onBuilding } : p))),
+        roads: edits.roads,
+        demolished: edits.demolished,
       } : null}
     />
   )
